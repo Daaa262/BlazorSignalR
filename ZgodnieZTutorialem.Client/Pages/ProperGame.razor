@@ -1,0 +1,50 @@
+﻿@page "/game/{tableName}"
+@rendermode InteractiveWebAssembly
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<PageTitle>Poker - Gra</PageTitle>
+
+<h3>Stół: @tableName</h3>
+
+@code {
+    [Parameter] public string? tableName { get; set; }
+
+    private HubConnection? hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/tablehub"))
+            .Build();
+        /*
+        hubConnection.On<string, int, int>("ReceiveNewTable", (tableName, playerCount, chipCount) =>
+        {
+            string tableTitle = $"Stół \"{tableName}\": {playerCount} graczy, {chipCount} żetonów";
+            messages.Add(tableTitle);
+            InvokeAsync(StateHasChanged);
+        });*/
+
+        await hubConnection.StartAsync();
+    }
+    /*
+    private async Task AddTable()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.SendAsync("AddTable", tableName, playerCount, chipCount);
+        }
+    }*/
+
+    public bool IsConnected =>
+        hubConnection?.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}

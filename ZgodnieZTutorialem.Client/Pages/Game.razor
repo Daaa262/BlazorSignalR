@@ -1,0 +1,50 @@
+﻿@page "/game"
+@rendermode InteractiveWebAssembly
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<PageTitle>Poker - Gra</PageTitle>
+
+<h1>Ładowanie...</h1>
+
+@code {
+    private HubConnection? hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/tablehub"))
+            .Build();
+
+        hubConnection.On("GoToLobby", () =>
+        {
+            GoToLobby();
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+        await hubConnection.SendAsync("CheckIfPlayerOnTable");
+    }
+
+    private async Task GoToLobby()
+    {
+        Navigation.NavigateTo("/lobby");
+    }
+
+    private async Task GoToGame(string tableName)
+    {
+        Navigation.NavigateTo($"/game/{tableName}");
+    }
+
+    public bool IsConnected =>
+        hubConnection?.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
