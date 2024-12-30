@@ -2,6 +2,7 @@ using ZgodnieZTutorialem.Client.Pages;
 using ZgodnieZTutorialem.Components;
 using Microsoft.AspNetCore.ResponseCompression;
 using ZgodnieZTutorialem.Hubs;
+using Microsoft.Extensions.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,7 @@ builder.Services.AddResponseCompression(opts =>
 });
 
 var app = builder.Build();
+
 app.UseResponseCompression();
 
 // Configure the HTTP request pipeline.
@@ -40,4 +42,5 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(typeof(ZgodnieZTutorialem.Client._Imports).Assembly);
 
 app.MapHub<TableHub>("/tablehub");
+
 app.Run();

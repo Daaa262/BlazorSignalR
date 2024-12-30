@@ -1,15 +1,85 @@
-﻿@page "/game"
+﻿@page "/game/{tableName}"
 @rendermode InteractiveWebAssembly
 @using Microsoft.AspNetCore.SignalR.Client
+@using ZgodnieZTutorialem.Client.Models
 @inject NavigationManager Navigation
 @implements IAsyncDisposable
 
 <PageTitle>Poker - Gra</PageTitle>
+<h1>Stół: @tableName</h1>
+<h2>Gracze: (@Players.Count/@MaxPlayerCount)</h2>
+@for (int i = 0; i < Players.Count; i++)
+{
+    <div class="player">
+        @if (i == MyIndex)
+        {
+            @if(Players[i].isReady)
+            {
+                <div style="color:#80d000">
+                    <h4>Gracz @(i + 1):</h4>
+                    <p>Stan Konta: @Players[i].Chips</p>
+                </div>
+            }
+            else
+            {
+                <div style="color:#009000">
+                    <h4>Gracz @(i + 1):</h4>
+                    <p>Stan Konta: @Players[i].Chips</p>
+                </div>
+            }
+        }
+        else
+        {
+            @if (Players[i].isReady)
+            {
+                <div style="color:#a0a000">
+                    <h4>Gracz @(i + 1):</h4>
+                    <p>Stan Konta: @Players[i].Chips</p>
+                </div>
+            }
+            else
+            {
+                <h4>Gracz @(i + 1):</h4>
+                <p>Stan Konta: @Players[i].Chips</p>
+            }
+        }
+    </div>
+}
 
-<h1>Ładowanie...</h1>
+@if (!Joined && Players.Count< MaxPlayerCount)
+{
+    <button @onclick="JoinTable">Dołącz</button>
+}
+
+@if (Joined && Players.Count == MaxPlayerCount && !Players[MyIndex.Value].isReady)
+{
+    <button @onclick="Ready">Jestem Gotów (@ReadyPlayers/@MaxPlayerCount)</button>
+}
 
 @code {
+    [Parameter] public string? tableName { get; set; }
+    List<Player> Players = new List<Player>();
+    int startChips;
+    bool Joined = false;
     private HubConnection? hubConnection;
+    int MaxPlayerCount;
+    private int? MyIndex;
+    private int ReadyPlayers = 0;
+    private bool infoReceived = false;
+
+    private async void Ready()
+    {
+        ReadyPlayers++;
+        Players[MyIndex.Value].isReady = true;
+        await hubConnection.SendAsync("Ready", tableName, MyIndex);
+    }
+
+    private async void JoinTable()
+    {
+        Joined = true;
+        MyIndex = Players.Count;
+        await hubConnection.SendAsync("JoinTable", tableName);
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -17,24 +87,39 @@
             .WithUrl(Navigation.ToAbsoluteUri("/tablehub"))
             .Build();
 
-        hubConnection.On("GoToLobby", () =>
+        hubConnection.On<int, int, int>("ReceiveInfo", (playerCount, maxPlayerCount, chipCount) =>
         {
-            GoToLobby();
+            if (!infoReceived)
+            {
+                infoReceived = true;
+
+                startChips = chipCount;
+                MaxPlayerCount = maxPlayerCount;
+
+                for (int i = 0; i < playerCount; i++)
+                {
+                    Players.Add(new Player(false, chipCount));
+                }
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        hubConnection.On("ReceiveNewPlayer", () =>
+        {
+            Players.Add(new Player(false, startChips));
             InvokeAsync(StateHasChanged);
         });
 
+        hubConnection.On<int>("NewReady", (index) =>
+		{
+            Players[index].isReady = true;
+			ReadyPlayers++;
+			InvokeAsync(StateHasChanged);
+		});
+
         await hubConnection.StartAsync();
-        await hubConnection.SendAsync("CheckIfPlayerOnTable");
-    }
-
-    private async Task GoToLobby()
-    {
-        Navigation.NavigateTo("/lobby");
-    }
-
-    private async Task GoToGame(string tableName)
-    {
-        Navigation.NavigateTo($"/game/{tableName}");
+        await hubConnection.SendAsync("AddToGroup", tableName);
+        await hubConnection.SendAsync("RequestInfo", tableName);
     }
 
     public bool IsConnected =>

@@ -1,6 +1,7 @@
 ﻿@page "/lobby"
 @rendermode InteractiveWebAssembly
 @using Microsoft.AspNetCore.SignalR.Client
+@using ZgodnieZTutorialem.Client.Models
 @inject NavigationManager Navigation
 @implements IAsyncDisposable
 
@@ -28,22 +29,30 @@
 
 <hr>
 
-@foreach (var message in messages)
+@foreach (var tab in tables)
 {
-    <button @onclick="GoToTable">@message</button>
+    @if (tab.PlayerCount == tab.TotalPlayerCount)
+    {
+        <button style="background-color:#ff9090" @onclick="() => GoToTable(tab.TableName)">Stół: @tab.TableName: (@tab.PlayerCount / @tab.TotalPlayerCount) graczy, @tab.ChipCount żetonów</button>
+    }
+    else
+    {
+        <button style="background-color:#90ff90" @onclick="() => GoToTable(tab.TableName)">Stół: @tab.TableName: (@tab.PlayerCount / @tab.TotalPlayerCount) graczy, @tab.ChipCount żetonów</button>
+    }
+
     <br>
     <br>
 }
 
 @code {
-    private void GoToTable()
+    private void GoToTable(string tableName)
     {
-		Navigation.NavigateTo($"/game/{tableName}");
+        Navigation.NavigateTo($"/game/{tableName}");
     }
 
     private HubConnection? hubConnection;
-    private List<string> messages = [];
-    private string tableName = "Nowy Stół";
+    private List<Table> tables = [];
+    private string tableName = "";
     private int playerCount = 2;
     private int chipCount = 500;
 
@@ -53,12 +62,24 @@
             .WithUrl(Navigation.ToAbsoluteUri("/tablehub"))
             .Build();
 
-        hubConnection.On<string, int, int>("ReceiveNewTable", (tableName, playerCount, chipCount) =>
+        hubConnection.On<string, int, int, int>("ReceiveNewTable", (tableName, totalPlayerCount, chipCount, playerCount) =>
         {
-            string tableTitle = $"Stół \"{tableName}\": {playerCount} graczy, {chipCount} żetonów";
-            messages.Add(tableTitle);
+            tables.Add(new Table(tableName, totalPlayerCount, chipCount, playerCount));
             InvokeAsync(StateHasChanged);
         });
+
+        hubConnection.On<string, int>("ReceiveNewPlayerCount", (tableName, newCount) =>
+		{
+		    for (int i = 0; i < tables.Count; i++)
+		    {
+			    if (tables[i].TableName == tableName)
+			    {
+				    tables[i].PlayerCount = newCount;
+				    break;
+			    }
+		    }
+			InvokeAsync(StateHasChanged);
+		});
 
         await hubConnection.StartAsync();
         await hubConnection.SendAsync("GetTables");
@@ -66,9 +87,9 @@
 
     private async Task AddTable()
     {
-        if (hubConnection is not null)
+        if (hubConnection is not null && tableName != "")
         {
-            await hubConnection.SendAsync("AddTable", tableName, playerCount, chipCount);
+            await hubConnection.SendAsync("AddTable", tableName, playerCount, chipCount, 0);
         }
     }
 
