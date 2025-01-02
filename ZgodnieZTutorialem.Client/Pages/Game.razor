@@ -7,78 +7,103 @@
 
 <PageTitle>Poker - Gra</PageTitle>
 <h1>Stół: @tableName</h1>
-<h2>Gracze: (@Players.Count/@MaxPlayerCount)</h2>
-@for (int i = 0; i < Players.Count; i++)
+
+@if (!thisTable.GameStarted)
 {
-    <div class="player">
-        @if (i == MyIndex)
-        {
-            @if(Players[i].isReady)
+    <h2>Gracze: (@thisTable.Players.Count/@thisTable.MaxPlayerCount)</h2>
+    @for (int i = 0; i < thisTable.Players.Count; i++)
+    {
+        <div class="player">
+            @if (i == MyIndex)
             {
-                <div style="color:#80d000">
-                    <h4>Gracz @(i + 1):</h4>
-                    <p>Stan Konta: @Players[i].Chips</p>
-                </div>
+                @if (thisTable.Players[i].IsReady)
+                {
+                    <div style="color:#80d000">
+                        <h4>Gracz @thisTable.Players[i].Nick:</h4>
+                        <p>Stan Konta: @thisTable.Players[i].Chips</p>
+                    </div>
+                }
+                else
+                {
+                    <div style="color:#009000">
+                        <h4>Gracz @thisTable.Players[i].Nick:</h4>
+                        <p>Stan Konta: @thisTable.Players[i].Chips</p>
+                    </div>
+                }
             }
             else
             {
-                <div style="color:#009000">
-                    <h4>Gracz @(i + 1):</h4>
-                    <p>Stan Konta: @Players[i].Chips</p>
-                </div>
+                @if (thisTable.Players[i].IsReady)
+                {
+                    <div style="color:#a0a000">
+                        <h4>Gracz @thisTable.Players[i].Nick:</h4>
+                        <p>Stan Konta: @thisTable.Players[i].Chips</p>
+                    </div>
+                }
+                else
+                {
+                    <h4>Gracz @thisTable.Players[i].Nick:</h4>
+                    <p>Stan Konta: @thisTable.Players[i].Chips</p>
+                }
             }
-        }
-        else
-        {
-            @if (Players[i].isReady)
-            {
-                <div style="color:#a0a000">
-                    <h4>Gracz @(i + 1):</h4>
-                    <p>Stan Konta: @Players[i].Chips</p>
-                </div>
-            }
-            else
-            {
-                <h4>Gracz @(i + 1):</h4>
-                <p>Stan Konta: @Players[i].Chips</p>
-            }
-        }
-    </div>
-}
+        </div>
+    }
 
-@if (!Joined && Players.Count< MaxPlayerCount)
-{
-    <button @onclick="JoinTable">Dołącz</button>
-}
+    @if (!Joined && thisTable.Players.Count < thisTable.MaxPlayerCount)
+    {
+        <label>
+            Nick:
+            <input @bind="nick" />
+        </label>
+        <button @onclick="JoinTable" disabled="@(nick=="")">Dołącz</button>
+    }
 
-@if (Joined && Players.Count == MaxPlayerCount && !Players[MyIndex.Value].isReady)
+    @if (Joined && thisTable.Players.Count == thisTable.MaxPlayerCount && MyIndex is not null && !thisTable.Players[MyIndex.Value].IsReady)
+    {
+        <button @onclick="Ready">Jestem Gotów (@ReadyPlayers/@thisTable.MaxPlayerCount)</button>
+    }
+}
+else
 {
-    <button @onclick="Ready">Jestem Gotów (@ReadyPlayers/@MaxPlayerCount)</button>
+    <h1>?????</h1>
 }
 
 @code {
     [Parameter] public string? tableName { get; set; }
-    List<Player> Players = new List<Player>();
-    int startChips;
-    bool Joined = false;
+
+    private bool Joined = false;
     private HubConnection? hubConnection;
-    int MaxPlayerCount;
     private int? MyIndex;
     private int ReadyPlayers = 0;
-    private bool infoReceived = false;
+    Table thisTable = new();
+    private string nick = "";
 
-    private async void Ready()
+    private async Task Ready()
     {
-        ReadyPlayers++;
-        Players[MyIndex.Value].isReady = true;
-        await hubConnection.SendAsync("Ready", tableName, MyIndex);
+        Console.WriteLine($"Ready called in Game");
+
+		if (hubConnection is not null)
+			await hubConnection.SendAsync("Ready", tableName, MyIndex);
     }
 
-    private async void JoinTable()
+    private async Task JoinTable()
     {
+        Console.WriteLine($"JoinTable called in Game with nick=\"{nick}\" and tableName=\"{tableName}\"");
+
+		foreach (var player in thisTable.Players)
+		{
+			if (player.Nick == nick)
+            {
+                Console.WriteLine("Cannot join (player with this nick already exists");
+				return;
+			}
+		}
+
         Joined = true;
-        MyIndex = Players.Count;
-        await hubConnection.SendAsync("JoinTable", tableName);
+        MyIndex = thisTable.Players.Count;
+
+        if (hubConnection is not null)
+            await hubConnection.SendAsync("JoinTable", tableName, nick);
     }
 
     protected override async Task OnInitializedAsync()
@@ -87,33 +112,36 @@
             .WithUrl(Navigation.ToAbsoluteUri("/tablehub"))
             .Build();
 
-        hubConnection.On<int, int, int>("ReceiveInfo", (playerCount, maxPlayerCount, chipCount) =>
+        hubConnection.On<Table>("ReceiveInfo", (tableInfo) =>
         {
-            if (!infoReceived)
-            {
-                infoReceived = true;
+            Console.WriteLine($"ReceiveInfo from hub with \"{tableInfo.TableName}\"");
 
-                startChips = chipCount;
-                MaxPlayerCount = maxPlayerCount;
+			thisTable = tableInfo;
 
-                for (int i = 0; i < playerCount; i++)
-                {
-                    Players.Add(new Player(false, chipCount));
-                }
-                InvokeAsync(StateHasChanged);
-            }
+            InvokeAsync(StateHasChanged);
         });
 
-        hubConnection.On("ReceiveNewPlayer", () =>
+        hubConnection.On<Player>("ReceiveNewPlayer", (newPlayer) =>
         {
-            Players.Add(new Player(false, startChips));
+            Console.WriteLine($"ReceiveNewPlayer from hub with \"{newPlayer.Nick}\"");
+
+            thisTable.Players.Add(newPlayer);
+
             InvokeAsync(StateHasChanged);
         });
 
         hubConnection.On<int>("NewReady", (index) =>
 		{
-            Players[index].isReady = true;
+            Console.WriteLine($"NewReady from hub with \"{index}\"");
+
+            thisTable.Players[index].IsReady = true;
 			ReadyPlayers++;
+
+		    if (ReadyPlayers == thisTable.MaxPlayerCount)
+		    {
+			    thisTable.GameStarted = true;
+		    }
+
 			InvokeAsync(StateHasChanged);
 		});
 

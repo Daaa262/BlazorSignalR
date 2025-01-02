@@ -31,13 +31,19 @@
 
 @foreach (var tab in tables)
 {
-    @if (tab.PlayerCount == tab.TotalPlayerCount)
+    @if (tab.Players.Count == tab.MaxPlayerCount)
     {
-        <button style="background-color:#ff9090" @onclick="() => GoToTable(tab.TableName)">Stół: @tab.TableName: (@tab.PlayerCount / @tab.TotalPlayerCount) graczy, @tab.ChipCount żetonów</button>
+        @if(tab.TableName is not null)
+        {
+            <button style="background-color:#ff9090" @onclick="() => GoToTable(tab.TableName)">Stół: @tab.TableName: (@tab.Players.Count / @tab.MaxPlayerCount) graczy, @tab.StartChipCount żetonów</button>
+        }
     }
     else
     {
-        <button style="background-color:#90ff90" @onclick="() => GoToTable(tab.TableName)">Stół: @tab.TableName: (@tab.PlayerCount / @tab.TotalPlayerCount) graczy, @tab.ChipCount żetonów</button>
+        @if (tab.TableName is not null)
+        {
+            <button style="background-color:#90ff90" @onclick="() => GoToTable(tab.TableName)">Stół: @tab.TableName: (@tab.Players.Count / @tab.MaxPlayerCount) graczy, @tab.StartChipCount żetonów</button>
+        }
     }
 
     <br>
@@ -47,11 +53,13 @@
 @code {
     private void GoToTable(string tableName)
     {
+        Console.WriteLine($"GoToTable called for \"{tableName}\"");
+
         Navigation.NavigateTo($"/game/{tableName}");
     }
 
     private HubConnection? hubConnection;
-    private List<Table> tables = [];
+    private List<Table> tables = new();
     private string tableName = "";
     private int playerCount = 2;
     private int chipCount = 500;
@@ -62,24 +70,29 @@
             .WithUrl(Navigation.ToAbsoluteUri("/tablehub"))
             .Build();
 
-        hubConnection.On<string, int, int, int>("ReceiveNewTable", (tableName, totalPlayerCount, chipCount, playerCount) =>
+        hubConnection.On<Table>("ReceiveNewTable", (newTable) =>
         {
-            tables.Add(new Table(tableName, totalPlayerCount, chipCount, playerCount));
+            Console.WriteLine($"ReceiveNewTable from hub with tableName=\"{newTable.TableName}\" and {newTable.Players.Count} players");
+            tables.Add(newTable);
             InvokeAsync(StateHasChanged);
         });
 
-        hubConnection.On<string, int>("ReceiveNewPlayerCount", (tableName, newCount) =>
-		{
-		    for (int i = 0; i < tables.Count; i++)
-		    {
-			    if (tables[i].TableName == tableName)
-			    {
-				    tables[i].PlayerCount = newCount;
-				    break;
-			    }
-		    }
-			InvokeAsync(StateHasChanged);
-		});
+        hubConnection.On<string, Player>("ReceiveNewPlayerLobby", (tableName, newPlayer) =>
+        {
+            Console.WriteLine($"ReceiveNewPlayerLobby from hub with \"{tableName}\" and \"{newPlayer.Nick}\"");
+
+            foreach (var tab in tables)
+            {
+                if (tab.TableName == tableName)
+                {
+                    Console.WriteLine($"{newPlayer.Nick} added to {tab.TableName}");
+                    tab.Players.Add(newPlayer);
+                    break;
+                }
+            }
+
+            InvokeAsync(StateHasChanged);
+        });
 
         await hubConnection.StartAsync();
         await hubConnection.SendAsync("GetTables");
@@ -87,9 +100,11 @@
 
     private async Task AddTable()
     {
+		Console.WriteLine($"AddTable called in Lobby");
+
         if (hubConnection is not null && tableName != "")
         {
-            await hubConnection.SendAsync("AddTable", tableName, playerCount, chipCount, 0);
+            await hubConnection.SendAsync("AddTable", new Table(tableName, playerCount, chipCount));
         }
     }
 

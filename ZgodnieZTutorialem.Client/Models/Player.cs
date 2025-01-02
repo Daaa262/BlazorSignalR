@@ -2,12 +2,19 @@
 {
     public class Player
     {
-        public bool isReady;
-        public int Chips;
-        public Player(bool isReady, int Chips)
+        public bool IsReady { get; set; }
+        public int Chips { get; set; }
+        public string? Nick { get; set; }
+        public Player(bool isReady, int chips, string nick)
         {
-            this.isReady = isReady;
-            this.Chips = Chips;
+            IsReady = isReady;
+            Chips = chips;
+            Nick = nick;
+        }
+
+        public Player() // This constructor is required for SignalR
+        {
+
         }
     }
 }
