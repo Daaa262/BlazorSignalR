@@ -9,7 +9,7 @@ namespace ZgodnieZTutorialem.Client.Models
         public int StartChipCount { get; set; }
         public List<Player> Players { get; set; } = [];
         public bool GameStarted { get; set; } = false;
-
+        public int[] Cards { get; set; } = new int[5];
         public Table(string tableName, int maxPlayerCount, int startChipCount)
         {
             TableName = tableName;

@@ -5,6 +5,7 @@
         public bool IsReady { get; set; }
         public int Chips { get; set; }
         public string? Nick { get; set; }
+        public int[] Cards { get; set; } = new int[2];
         public Player(bool isReady, int chips, string nick)
         {
             IsReady = isReady;

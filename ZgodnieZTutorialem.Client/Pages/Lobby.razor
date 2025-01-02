@@ -46,14 +46,15 @@
         }
     }
 
-    <br>
-    <br>
+    <br />
+    <br />
 }
 
 @code {
     private void GoToTable(string tableName)
     {
-        Console.WriteLine($"GoToTable called for \"{tableName}\"");
+        if (DebugInfo.debug)
+            Console.WriteLine($"GoToTable called for \"{tableName}\"");
 
         Navigation.NavigateTo($"/game/{tableName}");
     }
@@ -72,20 +73,23 @@
 
         hubConnection.On<Table>("ReceiveNewTable", (newTable) =>
         {
-            Console.WriteLine($"ReceiveNewTable from hub with tableName=\"{newTable.TableName}\" and {newTable.Players.Count} players");
+            if (DebugInfo.debug)
+                Console.WriteLine($"ReceiveNewTable from hub with tableName=\"{newTable.TableName}\" and {newTable.Players.Count} players");
             tables.Add(newTable);
             InvokeAsync(StateHasChanged);
         });
 
         hubConnection.On<string, Player>("ReceiveNewPlayerLobby", (tableName, newPlayer) =>
         {
-            Console.WriteLine($"ReceiveNewPlayerLobby from hub with \"{tableName}\" and \"{newPlayer.Nick}\"");
+            if (DebugInfo.debug)
+                Console.WriteLine($"ReceiveNewPlayerLobby from hub with \"{tableName}\" and \"{newPlayer.Nick}\"");
 
             foreach (var tab in tables)
             {
                 if (tab.TableName == tableName)
                 {
-                    Console.WriteLine($"{newPlayer.Nick} added to {tab.TableName}");
+                    if (DebugInfo.debug)
+                        Console.WriteLine($"{newPlayer.Nick} added to {tab.TableName}");
                     tab.Players.Add(newPlayer);
                     break;
                 }
@@ -100,7 +104,8 @@
 
     private async Task AddTable()
     {
-		Console.WriteLine($"AddTable called in Lobby");
+        if (DebugInfo.debug)
+		    Console.WriteLine($"AddTable called in Lobby");
 
         if (hubConnection is not null && tableName != "")
         {

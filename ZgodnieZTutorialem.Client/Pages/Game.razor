@@ -8,6 +8,7 @@
 <PageTitle>Poker - Gra</PageTitle>
 <h1>Stół: @tableName</h1>
 
+<!-- <img src="@((thisTable.Cards[0].ToString + ".png"))" style="width: 150px; height: auto;" /> -->
 @if (!thisTable.GameStarted)
 {
     <h2>Gracze: (@thisTable.Players.Count/@thisTable.MaxPlayerCount)</h2>
@@ -65,7 +66,23 @@
 }
 else
 {
-    <h1>?????</h1>
+    <h5>Karty na stole: </h5>
+	@foreach (var card in thisTable.Cards)
+	{
+		<h6>@card</h6>
+    }
+    <h5>Karty graczy:</h5>
+    @foreach (var player in thisTable.Players)
+    {
+        if (MyIndex is not null && player.Nick == thisTable.Players[MyIndex.Value].Nick)
+        {
+            <h6 style="color:#009000">@player.Cards[0] @player.Cards[1]</h6>
+        }
+        else
+        {
+            <h6>@player.Cards[0] @player.Cards[1]</h6>
+        }
+    }
 }
 
 @code {
@@ -80,24 +97,27 @@ else
 
     private async Task Ready()
     {
-        Console.WriteLine($"Ready called in Game");
+        if(DebugInfo.debug)
+            Console.WriteLine($"Ready called in Game by player \"{nick}\"");
 
-		if (hubConnection is not null)
-			await hubConnection.SendAsync("Ready", tableName, MyIndex);
+        if (hubConnection is not null)
+            await hubConnection.SendAsync("Ready", tableName, MyIndex);
     }
 
     private async Task JoinTable()
     {
-        Console.WriteLine($"JoinTable called in Game with nick=\"{nick}\" and tableName=\"{tableName}\"");
+        if (DebugInfo.debug)
+            Console.WriteLine($"JoinTable called in Game with nick=\"{nick}\" and tableName=\"{tableName}\"");
 
-		foreach (var player in thisTable.Players)
-		{
-			if (player.Nick == nick)
+        foreach (var player in thisTable.Players)
+        {
+            if (player.Nick == nick)
             {
-                Console.WriteLine("Cannot join (player with this nick already exists");
-				return;
-			}
-		}
+                if (DebugInfo.debug)
+                    Console.WriteLine("Cannot join (player with this nick already exists");
+                return;
+            }
+        }
 
         Joined = true;
         MyIndex = thisTable.Players.Count;
@@ -114,16 +134,18 @@ else
 
         hubConnection.On<Table>("ReceiveInfo", (tableInfo) =>
         {
-            Console.WriteLine($"ReceiveInfo from hub with \"{tableInfo.TableName}\"");
+            if (DebugInfo.debug)
+                Console.WriteLine($"ReceiveInfo from hub with \"{tableInfo.TableName}\"");
 
-			thisTable = tableInfo;
+            thisTable = tableInfo;
 
             InvokeAsync(StateHasChanged);
         });
 
         hubConnection.On<Player>("ReceiveNewPlayer", (newPlayer) =>
         {
-            Console.WriteLine($"ReceiveNewPlayer from hub with \"{newPlayer.Nick}\"");
+            if (DebugInfo.debug)
+                Console.WriteLine($"ReceiveNewPlayer from hub with \"{newPlayer.Nick}\"");
 
             thisTable.Players.Add(newPlayer);
 
@@ -131,19 +153,30 @@ else
         });
 
         hubConnection.On<int>("NewReady", (index) =>
-		{
-            Console.WriteLine($"NewReady from hub with \"{index}\"");
+        {
+            if (DebugInfo.debug)
+                Console.WriteLine($"NewReady from hub with \"{index}\"");
 
             thisTable.Players[index].IsReady = true;
-			ReadyPlayers++;
+            ReadyPlayers++;
 
-		    if (ReadyPlayers == thisTable.MaxPlayerCount)
-		    {
-			    thisTable.GameStarted = true;
-		    }
+            if (ReadyPlayers == thisTable.MaxPlayerCount)
+            {
+                thisTable.GameStarted = true;
+            }
 
-			InvokeAsync(StateHasChanged);
-		});
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<Table>("StartGame", (table) =>
+        {
+            if (DebugInfo.debug)
+                Console.WriteLine($"StartGame from hub");
+
+            thisTable = table;
+
+            InvokeAsync(StateHasChanged);
+        });
 
         await hubConnection.StartAsync();
         await hubConnection.SendAsync("AddToGroup", tableName);
