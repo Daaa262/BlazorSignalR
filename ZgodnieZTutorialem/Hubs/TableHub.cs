@@ -40,7 +40,7 @@ public class TableHub : Hub
 
                 foreach (var player in tab.Players)
                 {
-                    if (!player.Check)
+                    if (!player.Check && !player.Fold)
                     {
                         //if not all players checked
                         if(DebugInfo.debug)

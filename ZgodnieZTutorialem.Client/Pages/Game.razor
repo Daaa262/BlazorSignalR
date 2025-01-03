@@ -118,17 +118,17 @@ else
 
     @if(thisTable.Stage == 4)
     {
-		//TODO: Show winner
-		//TODO: Add button to reset game
+        //TODO: Show winner
+        //TODO: Add button to reset game
     }
-	else if (thisTable.Stage == 5) //if everyone folded but one player
+    else if (thisTable.Stage == 5) //if everyone folded but one player
     {
         //TODO: Show winner
         //TODO: Add button to reset game
     }
     else if(thisTable.Stage == 6) //end game
     {
-		//TODO Show winner
+        //TODO Show winner
         //TODO: Add button to go back to lobby
     }
 }
@@ -219,10 +219,44 @@ else
                 Console.WriteLine($"NewFold from hub with index=\"{index}\"");
 
             thisTable.Players[index].Fold = true;
-            do
+            foreach(var player in thisTable.Players)
             {
-                turn = (turn + 1) % thisTable.MaxPlayerCount;
-            } while (thisTable.Players[turn].Fold);
+                if(!player.Fold && !player.Check)
+                {
+					//if not all playing players checked or folded
+                    do
+                    {
+                        turn = (turn + 1) % thisTable.MaxPlayerCount;
+                    } while (thisTable.Players[turn].Fold);
+
+                    InvokeAsync(StateHasChanged);
+                    return;
+                }
+            }
+
+            //if all playing players checked or folded
+            if (DebugInfo.debug)
+                Console.WriteLine($"Every player checked or folded");
+            thisTable.Stage++;
+            foreach (var player in thisTable.Players)
+            {
+                player.Check = false;
+            }
+
+            bid = 0;
+            minBid = 0;
+            if (thisTable.MaxPlayerCount == 2)
+            {
+                turn = thisTable.Dealer;
+                while (thisTable.Players[turn].Fold)
+                    turn = (turn + 1) % thisTable.MaxPlayerCount;
+            }
+            else
+            {
+                turn = (thisTable.Dealer + 3) % thisTable.MaxPlayerCount;
+                while (thisTable.Players[turn].Fold)
+                    turn = (turn + 1) % thisTable.MaxPlayerCount;
+            }
 
             InvokeAsync(StateHasChanged);
         });
@@ -236,7 +270,7 @@ else
 
             foreach (var player in thisTable.Players)
             {
-                if(!player.Check)
+                if(!player.Check && !player.Fold)
                 {
                     //if not all players checked
                     if (DebugInfo.debug)
@@ -244,7 +278,14 @@ else
 
                     thisTable.Players[index].CurrentBid += newBid;
                     thisTable.Players[index].Chips -= newBid;
-                    turn = (turn + 1) % thisTable.MaxPlayerCount;
+                    do
+                    {
+                        turn = (turn + 1) % thisTable.MaxPlayerCount;
+                    } while (thisTable.Players[turn].Fold);
+
+                    if (MyIndex is not null)
+                        minBid = thisTable.Players[index].CurrentBid - thisTable.Players[MyIndex.Value].CurrentBid;
+                    bid = minBid;
 
                     InvokeAsync(StateHasChanged);
                     return;
