@@ -8,45 +8,14 @@
 <PageTitle>Poker - Gra</PageTitle>
 <h1>Stół: @tableName</h1>
 
-<!-- <img src="@((thisTable.Cards[0].ToString + ".png"))" style="width: 150px; height: auto;" /> -->
 @if (!thisTable.GameStarted)
 {
     <h2>Gracze: (@thisTable.Players.Count/@thisTable.MaxPlayerCount)</h2>
     @for (int i = 0; i < thisTable.Players.Count; i++)
     {
-        <div class="player">
-            @if (i == MyIndex)
-            {
-                @if (thisTable.Players[i].IsReady)
-                {
-                    <div style="color:#80d000">
-                        <h4>Gracz @thisTable.Players[i].Nick:</h4>
-                        <p>Stan Konta: @thisTable.Players[i].Chips</p>
-                    </div>
-                }
-                else
-                {
-                    <div style="color:#009000">
-                        <h4>Gracz @thisTable.Players[i].Nick:</h4>
-                        <p>Stan Konta: @thisTable.Players[i].Chips</p>
-                    </div>
-                }
-            }
-            else
-            {
-                @if (thisTable.Players[i].IsReady)
-                {
-                    <div style="color:#a0a000">
-                        <h4>Gracz @thisTable.Players[i].Nick:</h4>
-                        <p>Stan Konta: @thisTable.Players[i].Chips</p>
-                    </div>
-                }
-                else
-                {
-                    <h4>Gracz @thisTable.Players[i].Nick:</h4>
-                    <p>Stan Konta: @thisTable.Players[i].Chips</p>
-                }
-            }
+        <div style=@(i == MyIndex ? (thisTable.Players[i].IsReady ? "color:#80d000" : "color:#009000") : (thisTable.Players[i].IsReady ? "color:#a0a000" : ""))>
+            <h4>Gracz @thisTable.Players[i].Nick:</h4>
+            Ilość żetonów: @thisTable.Players[i].Chips
         </div>
     }
 
@@ -66,22 +35,101 @@
 }
 else
 {
-    <h5>Karty na stole: </h5>
-	@foreach (var card in thisTable.Cards)
-	{
-		<h6>@card</h6>
-    }
-    <h5>Karty graczy:</h5>
-    @foreach (var player in thisTable.Players)
+    @if(thisTable.Stage == 0)
     {
-        if (MyIndex is not null && player.Nick == thisTable.Players[MyIndex.Value].Nick)
+        <img src="@("Cards/unknown.png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/unknown.png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/unknown.png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/unknown.png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/unknown.png")" style="width: 100px; height: auto;" />
+    }
+    else if(thisTable.Stage == 1)
+    {
+        <img src="@("Cards/" + thisTable.Cards[0].ToString() + ".png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/" + thisTable.Cards[1].ToString() + ".png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/" + thisTable.Cards[2].ToString() + ".png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/unknown.png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/unknown.png")" style="width: 100px; height: auto;" />
+    }
+    else if(thisTable.Stage == 2)
+    {
+        <img src="@("Cards/" + thisTable.Cards[0].ToString() + ".png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/" + thisTable.Cards[1].ToString() + ".png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/" + thisTable.Cards[2].ToString() + ".png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/" + thisTable.Cards[3].ToString() + ".png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/unknown.png")" style="width: 100px; height: auto;" />
+    }
+    else if (thisTable.Stage >= 3)
+    {
+        <img src="@("Cards/" + thisTable.Cards[0].ToString() + ".png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/" + thisTable.Cards[1].ToString() + ".png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/" + thisTable.Cards[2].ToString() + ".png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/" + thisTable.Cards[3].ToString() + ".png")" style="width: 100px; height: auto;" />
+        <img src="@("Cards/" + thisTable.Cards[4].ToString() + ".png")" style="width: 100px; height: auto;" />
+    }
+    <br>
+    <br>
+    @for(int i = 0; i < thisTable.MaxPlayerCount; i++)
+    {
+        @if (MyIndex is not null && i == MyIndex)
         {
-            <h6 style="color:#009000">@player.Cards[0] @player.Cards[1]</h6>
+            <div style=@(thisTable.Players[i].Fold ? "color:#70c070" : "color:#009000")>
+                @if (thisTable.Dealer == i)
+                {
+                    <h3>@thisTable.Players[i].Nick (Dealer)</h3>
+                }
+                else
+                {
+                    <h3>@thisTable.Players[i].Nick</h3>
+                }
+                <h5>Żetony: @thisTable.Players[i].Chips</h5>
+                <img src="@("Cards/" + thisTable.Players[i].Cards[0].ToString() + ".png")" style="width: 50px; height: auto;" />
+                <img src="@("Cards/" + thisTable.Players[i].Cards[1].ToString() + ".png")" style="width: 50px; height: auto;" />
+                @if(i == turn && thisTable.Stage < 4)
+                {
+                    <input @bind="bid"/>
+                    <button @onclick="Bid" disabled="@(bid > thisTable.Players[i].Chips || bid > maxBid || bid <= minBid || thisTable.Players[i].Fold)">Podbij</button>
+                    <button @onclick="Check" disabled="@(bid != minBid || thisTable.Players[i].Fold)">Sprawdź</button>
+                    <button @onclick="Fold" disabled="@thisTable.Players[i].Fold">Pas</button>
+                }
+                <h5>Postawiono: @thisTable.Players[i].CurrentBid</h5>
+            </div>
+            <br>
         }
         else
         {
-            <h6>@player.Cards[0] @player.Cards[1]</h6>
+            <div style="@(thisTable.Players[i].Fold ? "color:#b0b0b0" : "")">
+                @if (thisTable.Dealer == i)
+                {
+                    <h3>@thisTable.Players[i].Nick (Dealer)</h3>
+                }
+                else
+                {
+                    <h3>@thisTable.Players[i].Nick</h3>
+                }
+                <h5>Żetony: @thisTable.Players[i].Chips</h5>
+                <img src="Cards/unknown.png" style="width: 50px; height: auto;" />
+                <img src="Cards/unknown.png" style="width: 50px; height: auto;" />
+                <h5>Postawiono: @thisTable.Players[i].CurrentBid</h5>
+            </div>
+            <br>
         }
+    }
+
+    @if(thisTable.Stage == 4)
+    {
+		//TODO: Show winner
+		//TODO: Add button to reset game
+    }
+	else if (thisTable.Stage == 5) //if everyone folded but one player
+    {
+        //TODO: Show winner
+        //TODO: Add button to reset game
+    }
+    else if(thisTable.Stage == 6) //end game
+    {
+		//TODO Show winner
+        //TODO: Add button to go back to lobby
     }
 }
 
@@ -94,6 +142,39 @@ else
     private int ReadyPlayers = 0;
     Table thisTable = new();
     private string nick = "";
+    private int bid = 0;
+    private int minBid = 0;
+    private int maxBid = 0;
+    private int turn = 0;
+
+    private async Task Fold()
+    {
+        if (DebugInfo.debug)
+            Console.WriteLine($"Fold called in Game by player \"{nick}\"");
+
+        if (hubConnection is not null)
+            await hubConnection.SendAsync("Fold", tableName, MyIndex);
+    }
+
+    private async Task Check()
+    {
+        if (DebugInfo.debug)
+            Console.WriteLine($"Check called in Game by player \"{nick}\" and bid {bid}");
+
+        if (hubConnection is not null)
+            await hubConnection.SendAsync("Check", tableName, MyIndex, bid);
+    }
+
+    private async Task Bid()
+    {
+        if (DebugInfo.debug)
+            Console.WriteLine($"Bid {bid} called in Game by player \"{nick}\" and bid {bid}");
+
+        if (hubConnection is not null && MyIndex is not null)
+        {
+            await hubConnection.SendAsync("Bid", tableName, MyIndex, bid);
+        }
+    }
 
     private async Task Ready()
     {
@@ -131,6 +212,106 @@ else
         hubConnection = new HubConnectionBuilder()
             .WithUrl(Navigation.ToAbsoluteUri("/tablehub"))
             .Build();
+
+        hubConnection.On<int>("NewFold", (index) =>
+        {
+            if (DebugInfo.debug)
+                Console.WriteLine($"NewFold from hub with index=\"{index}\"");
+
+            thisTable.Players[index].Fold = true;
+            do
+            {
+                turn = (turn + 1) % thisTable.MaxPlayerCount;
+            } while (thisTable.Players[turn].Fold);
+
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<int, int>("NewCheck", (index, newBid) =>
+        {
+            if (DebugInfo.debug)
+                Console.WriteLine($"NewCheck from hub with index=\"{index}\" and bid {newBid}");
+
+            thisTable.Players[index].Check = true;
+
+            foreach (var player in thisTable.Players)
+            {
+                if(!player.Check)
+                {
+                    //if not all players checked
+                    if (DebugInfo.debug)
+                        Console.WriteLine($"Player \"{player.Nick}\" didn't check");
+
+                    thisTable.Players[index].CurrentBid += newBid;
+                    thisTable.Players[index].Chips -= newBid;
+                    turn = (turn + 1) % thisTable.MaxPlayerCount;
+
+                    InvokeAsync(StateHasChanged);
+                    return;
+                }
+            }
+
+            //if all players checked
+            if (DebugInfo.debug)
+                Console.WriteLine($"Every player checked");
+            thisTable.Players[index].CurrentBid += newBid;
+            thisTable.Players[index].Chips -= newBid;
+            thisTable.Stage++;
+            foreach (var player in thisTable.Players)
+            {
+                player.Check = false;
+            }
+
+            bid = 0;
+            minBid = 0;
+            if (thisTable.MaxPlayerCount == 2)
+            {
+                turn = thisTable.Dealer;
+                while (thisTable.Players[turn].Fold)
+                    turn = (turn + 1) % thisTable.MaxPlayerCount;
+            }
+            else
+            {
+                turn = (thisTable.Dealer + 3) % thisTable.MaxPlayerCount;
+                while (thisTable.Players[turn].Fold)
+                    turn = (turn + 1) % thisTable.MaxPlayerCount;
+            }
+
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<int, int>("NewBid", (index, newBid) =>
+        {
+            if (DebugInfo.debug)
+                Console.WriteLine($"NewBid from hub with index=\"{index}\" and bid=\"{newBid}\"");
+
+            thisTable.Players[index].CurrentBid += newBid;
+            thisTable.Players[index].Chips -= newBid;
+            foreach(var player in thisTable.Players)
+            {
+				player.Check = false;
+            }
+            thisTable.Players[index].Check = true;
+
+            if (MyIndex is not null)
+                minBid = thisTable.Players[index].CurrentBid - thisTable.Players[MyIndex.Value].CurrentBid;
+            bid = minBid;
+
+            int buffer = thisTable.StartChipCount * 6;
+            foreach (var player in thisTable.Players)
+            {
+                if (player.CurrentBid + player.Chips < buffer)
+                    buffer = player.CurrentBid + player.Chips;
+            }
+            maxBid = buffer;
+
+            do
+            {
+                turn = (turn + 1) % thisTable.MaxPlayerCount;
+			} while (thisTable.Players[turn].Fold);
+
+            InvokeAsync(StateHasChanged);
+        });
 
         hubConnection.On<Table>("ReceiveInfo", (tableInfo) =>
         {
@@ -174,6 +355,26 @@ else
                 Console.WriteLine($"StartGame from hub");
 
             thisTable = table;
+            if (thisTable.MaxPlayerCount == 2)
+            {
+                bid = table.Blind;
+                minBid = table.Blind;
+                turn = thisTable.Dealer;
+				thisTable.Players[(thisTable.Dealer + 1) % thisTable.MaxPlayerCount].Check = true;
+            }
+            else
+            {
+                bid = table.Blind * 2;
+                minBid = table.Blind * 2;
+                turn = (thisTable.Dealer + 3) % thisTable.MaxPlayerCount;
+                thisTable.Players[(thisTable.Dealer + 2) % thisTable.MaxPlayerCount].Check = true;
+            }
+
+		    if (MyIndex is not null)
+                maxBid = table.StartChipCount - table.Players[MyIndex.Value].CurrentBid;
+
+            if (DebugInfo.debug)
+                Console.WriteLine($"Bidding starts with player index {turn}");
 
             InvokeAsync(StateHasChanged);
         });

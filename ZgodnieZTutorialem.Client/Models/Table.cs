@@ -10,12 +10,15 @@ namespace ZgodnieZTutorialem.Client.Models
         public List<Player> Players { get; set; } = [];
         public bool GameStarted { get; set; } = false;
         public int[] Cards { get; set; } = new int[5];
-        public Table(string tableName, int maxPlayerCount, int startChipCount)
+        public int Dealer { get; set; }
+        public int Stage { get; set; }
+        public int Blind { get; set; }
+        public Table(string tableName, int maxPlayerCount, int startChipCount, int blind)
         {
             TableName = tableName;
             MaxPlayerCount = maxPlayerCount;
             StartChipCount = startChipCount;
-            Players = [];
+            Blind = blind;
         }
         public Table() // This constructor is required for SignalR
         {

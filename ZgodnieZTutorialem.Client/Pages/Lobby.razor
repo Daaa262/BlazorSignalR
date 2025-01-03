@@ -25,7 +25,13 @@
         <input @bind="chipCount" />
     </label>
 </div>
-<button @onclick="AddTable" disabled="@(!IsConnected || playerCount < 2 || playerCount > 6 || chipCount < 100 || chipCount > 10000)">Utwórz</button>
+<div class="form-group">
+    <label>
+        Blind (5-100):
+        <input @bind="blind" />
+    </label>
+</div>
+<button @onclick="AddTable" disabled="@(!IsConnected || playerCount < 2 || playerCount > 6 || chipCount < 100 || chipCount > 10000 || blind < 5 || blind > 100)">Utwórz</button>
 
 <hr>
 
@@ -64,6 +70,7 @@
     private string tableName = "";
     private int playerCount = 2;
     private int chipCount = 500;
+    private int blind = 10;
 
     protected override async Task OnInitializedAsync()
     {
@@ -109,7 +116,7 @@
 
         if (hubConnection is not null && tableName != "")
         {
-            await hubConnection.SendAsync("AddTable", new Table(tableName, playerCount, chipCount));
+            await hubConnection.SendAsync("AddTable", new Table(tableName, playerCount, chipCount, blind));
         }
     }
 

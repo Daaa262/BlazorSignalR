@@ -1,6 +1,8 @@
 ﻿using System.ComponentModel;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.SignalR;
 using ZgodnieZTutorialem.Client.Models;
 
@@ -10,6 +12,82 @@ public class TableHub : Hub
 {
     private static List<Table> table = [];
     public Random random = new();
+    public async Task Fold(string tableName, int index)
+    {
+        if (DebugInfo.debug)
+            Console.WriteLine($"Fold in hub called for \"{tableName}\" with player index {index}");
+
+        foreach (var tab in table)
+        {
+            if (tab.TableName == tableName)
+            {
+                tab.Players[index].Fold = true;
+                await Clients.Group(tableName).SendAsync("NewFold", index);
+                return;
+            }
+        }
+    }
+    public async Task Check(string tableName, int index, int bid)
+    {
+        if (DebugInfo.debug)
+            Console.WriteLine($"Check in hub called for \"{tableName}\" with player index {index} and bid {bid}");
+
+        foreach (var tab in table)
+        {
+            if (tab.TableName == tableName)
+            {
+                tab.Players[index].Check = true;
+
+                foreach (var player in tab.Players)
+                {
+                    if (!player.Check)
+                    {
+                        //if not all players checked
+                        if(DebugInfo.debug)
+                            Console.WriteLine($"Player \"{player.Nick}\" did not check");
+                        tab.Players[index].CurrentBid += bid;
+                        tab.Players[index].Chips -= bid;
+                        await Clients.Group(tableName).SendAsync("NewCheck", index, bid);
+                        return;
+                    }
+                }
+
+                //if all players checked
+                if (DebugInfo.debug)
+                    Console.WriteLine($"Every player checked");
+                tab.Players[index].CurrentBid += bid;
+                tab.Players[index].Chips -= bid;
+                tab.Stage++;
+                foreach(var player in tab.Players)
+                {
+                    player.Check = false;
+                }
+                await Clients.Group(tableName).SendAsync("NewCheck", index, bid);
+                return;
+            }
+        }
+    }
+    public async Task Bid(string tableName, int index, int bid)
+    {
+        if(DebugInfo.debug)
+            Console.WriteLine($"Bid in hub called for \"{tableName}\" with player index {index} and bid {bid}");
+
+        foreach (var tab in table)
+        {
+            if (tab.TableName == tableName)
+            {
+                foreach (var player in tab.Players)
+                {
+                    player.Check = false;
+                }
+                tab.Players[index].Check = true;
+                tab.Players[index].CurrentBid += bid;
+                tab.Players[index].Chips -= bid;
+                await Clients.Group(tableName).SendAsync("NewBid", index, bid);
+                return;
+            }
+        }
+    }
     public async Task Ready(string tableName, int index)
     {
         foreach(var tab in table)
@@ -141,6 +219,27 @@ public class TableHub : Hub
                 }
 
                 tab.GameStarted = true;
+                tab.Dealer = random.Next(tab.MaxPlayerCount);
+                tab.Stage = 0;
+
+                if (tab.MaxPlayerCount == 2)
+                {
+                    tab.Players[tab.Dealer].CurrentBid = tab.Blind;
+                    tab.Players[tab.Dealer].Chips -= tab.Blind;
+
+                    tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].CurrentBid = tab.Blind * 2;
+                    tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].Chips -= tab.Blind * 2;
+                    tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].Check = true;
+                }
+                else
+                {
+                    tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].CurrentBid = tab.Blind;
+                    tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].Chips -= tab.Blind;
+
+                    tab.Players[(tab.Dealer + 2) % tab.MaxPlayerCount].CurrentBid = tab.Blind * 2;
+                    tab.Players[(tab.Dealer + 2) % tab.MaxPlayerCount].Chips -= tab.Blind * 2;
+                    tab.Players[(tab.Dealer + 2) % tab.MaxPlayerCount].Check = true;
+                }
 
                 await Clients.Group(tableName).SendAsync("StartGame", tab);
                 break;
