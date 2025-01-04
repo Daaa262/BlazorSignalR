@@ -78,7 +78,7 @@ else
             <h3>@thisTable.Players[i].Nick@(thisTable.Dealer == i ? " (Dealer)" : "")</h3>
             <h5>Żetony: @thisTable.Players[i].Chips</h5>
 
-            @if (i == MyIndex || thisTable.Stage == 4 || thisTable.Stage == 6)
+            @if (i == MyIndex || (thisTable.Stage == 4 && !thisTable.Players[i].Fold))
             {
                 <img src="@("Cards/" + thisTable.Players[i].Cards[0].ToString() + ".png")" style="width: 50px; height: auto;" />
                 <img src="@("Cards/" + thisTable.Players[i].Cards[1].ToString() + ".png")" style="width: 50px; height: auto;" />
@@ -102,7 +102,7 @@ else
 
     @if(thisTable.Stage == 4)
     {
-        <h1>Rozdanie wygrywa gracz @thisTable.Players[thisTable.Winner].Nick</h1>
+        <h2>Rozdanie wygrywa gracz @thisTable.Players[thisTable.Winner].Nick z układem: @thisTable.WinningCombinationString() @thisTable.WinningConfiguration</h2>
         //TODO: Show cofiguration of winning hand and chips won
 
         <button>Okej</button>
@@ -110,7 +110,7 @@ else
     }
     else if (thisTable.Stage == 5) //if everyone folded but one player
     {
-        <h1>Wszyscy gracze spasowali, rozdanie wygrywa @thisTable.Players[thisTable.Winner].Nick</h1>
+        <h2>Wszyscy gracze spasowali, rozdanie wygrywa @thisTable.Players[thisTable.Winner].Nick</h2>
         //TODO: Show chips won
 
         <button>Okej</button>
@@ -118,7 +118,7 @@ else
     }
     else if(thisTable.Stage == 6) //end game
     {
-        <h1>Gre wygrywa gracz @thisTable.Players[thisTable.Winner].Nick</h1>
+        <h2>Gre wygrywa gracz @thisTable.Players[thisTable.Winner].Nick</h2>
         //TODO Show winner
 
         <button>Okej</button>
