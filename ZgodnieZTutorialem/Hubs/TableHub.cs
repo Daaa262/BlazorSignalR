@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Numerics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -21,7 +22,8 @@ public class TableHub : Hub
         {
             if (tab.TableName == tableName)
             {
-                tab.Players[index].Fold = true;
+                tab.Fold(index);
+
                 await Clients.Group(tableName).SendAsync("NewFold", index);
                 return;
             }
@@ -36,32 +38,8 @@ public class TableHub : Hub
         {
             if (tab.TableName == tableName)
             {
-                tab.Players[index].Check = true;
+                tab.Check(index, bid);
 
-                foreach (var player in tab.Players)
-                {
-                    if (!player.Check && !player.Fold)
-                    {
-                        //if not all players checked
-                        if(DebugInfo.debug)
-                            Console.WriteLine($"Player \"{player.Nick}\" did not check");
-                        tab.Players[index].CurrentBid += bid;
-                        tab.Players[index].Chips -= bid;
-                        await Clients.Group(tableName).SendAsync("NewCheck", index, bid);
-                        return;
-                    }
-                }
-
-                //if all players checked
-                if (DebugInfo.debug)
-                    Console.WriteLine($"Every player checked");
-                tab.Players[index].CurrentBid += bid;
-                tab.Players[index].Chips -= bid;
-                tab.Stage++;
-                foreach(var player in tab.Players)
-                {
-                    player.Check = false;
-                }
                 await Clients.Group(tableName).SendAsync("NewCheck", index, bid);
                 return;
             }
@@ -76,13 +54,8 @@ public class TableHub : Hub
         {
             if (tab.TableName == tableName)
             {
-                foreach (var player in tab.Players)
-                {
-                    player.Check = false;
-                }
-                tab.Players[index].Check = true;
-                tab.Players[index].CurrentBid += bid;
-                tab.Players[index].Chips -= bid;
+                tab.Bid(index, bid);
+
                 await Clients.Group(tableName).SendAsync("NewBid", index, bid);
                 return;
             }
@@ -222,6 +195,7 @@ public class TableHub : Hub
                 tab.Dealer = random.Next(tab.MaxPlayerCount);
                 tab.Stage = 0;
 
+                //set blinds
                 if (tab.MaxPlayerCount == 2)
                 {
                     tab.Players[tab.Dealer].CurrentBid = tab.Blind;
@@ -230,6 +204,8 @@ public class TableHub : Hub
                     tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].CurrentBid = tab.Blind * 2;
                     tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].Chips -= tab.Blind * 2;
                     tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].Check = true;
+
+                    tab.Turn = tab.Dealer;
                 }
                 else
                 {
@@ -239,6 +215,8 @@ public class TableHub : Hub
                     tab.Players[(tab.Dealer + 2) % tab.MaxPlayerCount].CurrentBid = tab.Blind * 2;
                     tab.Players[(tab.Dealer + 2) % tab.MaxPlayerCount].Chips -= tab.Blind * 2;
                     tab.Players[(tab.Dealer + 2) % tab.MaxPlayerCount].Check = true;
+
+                    tab.Turn = (tab.Dealer + 3) % tab.MaxPlayerCount;
                 }
 
                 await Clients.Group(tableName).SendAsync("StartGame", tab);

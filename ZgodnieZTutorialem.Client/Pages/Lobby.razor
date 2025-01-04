@@ -27,11 +27,11 @@
 </div>
 <div class="form-group">
     <label>
-        Blind (5-100):
+        Blind (5-50):
         <input @bind="blind" />
     </label>
 </div>
-<button @onclick="AddTable" disabled="@(!IsConnected || playerCount < 2 || playerCount > 6 || chipCount < 100 || chipCount > 10000 || blind < 5 || blind > 100)">Utwórz</button>
+<button @onclick="AddTable" disabled="@(!IsConnected || playerCount < 2 || playerCount > 6 || chipCount < 100 || chipCount > 10000 || blind < 5 || blind > 50)">Utwórz</button>
 
 <hr>
 
