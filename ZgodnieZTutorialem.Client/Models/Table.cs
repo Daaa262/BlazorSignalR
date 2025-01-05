@@ -18,10 +18,11 @@ namespace ZgodnieZTutorialem.Client.Models
         public int Dealer { get; set; }
         public int Stage { get; set; }
         public int Blind { get; set; }
-        public int Winner { get; set; }
+        public List<int> Winner { get; set; } = [];
         public int WinningConfiguration { get; set; }
         public int Turn { get; set; }
-        public Random Rand { get; set; } = new();
+        private Random Rand { get; set; } = new();
+        public int Pot { get; set; }
         public Table(string tableName, int maxPlayerCount, int startChipCount, int blind)
         {
             TableName = tableName;
@@ -33,7 +34,7 @@ namespace ZgodnieZTutorialem.Client.Models
         {
 
         }
-        public void DrawCards()
+        private void DrawCards()
         {
             //CardFlag is used to check if card is already drawn (set false if drawn)
 
@@ -131,6 +132,12 @@ namespace ZgodnieZTutorialem.Client.Models
                 }
             }
         }
+        private void CalculatePot()
+        {
+            Pot = 0;
+            foreach (var player in Players)
+                Pot += player.CurrentBid;
+        }
         public void StartRound(bool first = false)
         {
             DrawCards();
@@ -140,16 +147,30 @@ namespace ZgodnieZTutorialem.Client.Models
             else
             {
                 Dealer = (Dealer + 1) % Players.Count;
-                int pot = 0;
                 foreach(var player in Players)
                 {
-                    pot += player.CurrentBid;
                     player.CurrentBid = 0;
                     player.Okej = false;
                     player.Check = false;
                     player.Fold = false;
                 }
-                Players[Winner].Chips += pot;
+
+                int remainder = Pot % Winner.Count;
+                foreach(var winner in Winner)
+                {
+                    Players[winner].Chips += Pot / Winner.Count;
+                }
+
+                int index = 0;
+                while(remainder > 0)
+                {
+                    index++;
+                    if (Players[(Dealer + index) % Players.Count].Fold)
+                        continue;
+
+                    Players[(Dealer + index) % Players.Count].Chips++;
+                    remainder--;
+                }
             }
             Stage = 0;
 
@@ -186,7 +207,7 @@ namespace ZgodnieZTutorialem.Client.Models
                 Turn = (Turn + 1) % Players.Count;
             } while (Players[Turn].Fold);
         }
-        public void SetStartTurn()
+        private void SetStartTurn()
         {
             if (Players.Count == 2)
             {
@@ -212,11 +233,12 @@ namespace ZgodnieZTutorialem.Client.Models
 
             //Check if there is only one player left
             bool foldFlag = false;
+            int winnerIndex = 0;
             for (int i = 0; i < Players.Count; i++)
             {
                 if (!Players[i].Fold)
                 {
-                    Winner = i; //preemptively set the winner
+                    winnerIndex = i; //preemptively set the winner
                     if (foldFlag)
                     {
                         foldFlag = false;
@@ -229,6 +251,10 @@ namespace ZgodnieZTutorialem.Client.Models
             if (foldFlag)
             {
                 Stage = 5;
+                Winner.Clear();
+                Winner.Add(winnerIndex);
+                CalculatePot();
+
                 return;
             }
 
@@ -286,6 +312,7 @@ namespace ZgodnieZTutorialem.Client.Models
             if (Stage == 4)
             {
                 FindWinner();
+                CalculatePot();
                 return;
             }
 
@@ -311,8 +338,16 @@ namespace ZgodnieZTutorialem.Client.Models
         }
 
 
+        private void SetWinningConfiguration(int configuration, int index, ref bool continueFlag)
+        {
+            if (WinningConfiguration > configuration)
+                Winner.Clear();
+            WinningConfiguration = configuration;
+            Winner.Add(index);
+            continueFlag = true;
+        }
 
-        public void FindWinner() //ADD SPLITTING
+        private void FindWinner()
         {
             //cards are encoded as 52 bit integer where each bit set to 1 means card appeared, and 0 means it doesn't bit from left to right are A K Q J 10 9 8 7 6 5 4 3 2 and suits are ordered left to right as ♥♦♣♠
 
@@ -334,7 +369,7 @@ namespace ZgodnieZTutorialem.Client.Models
             }
 
             WinningConfiguration = 410; // 1 best, higher worse
-            Winner = -1;
+            Winner.Clear();
             for (int i = 0; i < Players.Count; i++)
             {
                 if(Players[i].Fold)
@@ -347,20 +382,16 @@ namespace ZgodnieZTutorialem.Client.Models
                 temp = hand[i];
                 for (int j = 0; j < 4; j++)
                 {
-                    if ((temp & 0b1_0000_0000_1111) == 0b1_0000_0000_1111 && WinningConfiguration > 10)
+                    if ((temp & 0b1_0000_0000_1111) == 0b1_0000_0000_1111 && WinningConfiguration >= 10)
                     {
-                        WinningConfiguration = 10;
-                        Winner = i;
-                        continueFlag = true;
+                        SetWinningConfiguration(10, i, ref continueFlag);
                     }
 
                     for (int k = 0; k < 9; k++)
                     {
                         if ((temp & 0b11111) == 0b11111 && WinningConfiguration > 9 - k)
                         {
-                            WinningConfiguration = 9 - k;
-                            Winner = i;
-                            continueFlag = true;
+                            SetWinningConfiguration(9 - k, i, ref continueFlag);
                         }
                         temp >>= 1;
                     }
@@ -377,9 +408,7 @@ namespace ZgodnieZTutorialem.Client.Models
                 for (int j = 0; j < 13; j++)
                     if (long.PopCount(temp & (0b1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000L >> j)) == 4 && WinningConfiguration > 11 + j)
                     {
-                        WinningConfiguration = 11 + j;
-                        Winner = i;
-                        continueFlag = true;
+                        SetWinningConfiguration(11 + j, i, ref continueFlag);
                     }
 
                 if (continueFlag)
@@ -397,9 +426,7 @@ namespace ZgodnieZTutorialem.Client.Models
 
                             if (long.PopCount(temp & (0b1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000L >> k)) == 2 && WinningConfiguration > 24 + j * 13 + k)
                             {
-                                WinningConfiguration = 24 + j * 13 + k;
-                                Winner = i;
-                                continueFlag = true;
+                                SetWinningConfiguration(24 + j * 13 + k, i, ref continueFlag);
                             }
                         }
                     }
@@ -417,9 +444,7 @@ namespace ZgodnieZTutorialem.Client.Models
                         {
                             if ((temp & (0b1L << (13 * j + k))) != 0 && WinningConfiguration > 193 + k)
                             {
-                                WinningConfiguration = 193 + k;
-                                Winner = i;
-                                continueFlag = true;
+                                SetWinningConfiguration(193 + k, i, ref continueFlag);
                             }
                         }
                     }
@@ -446,8 +471,7 @@ namespace ZgodnieZTutorialem.Client.Models
                 }
                 if (length >= 5 && WinningConfiguration > 206 + highest)
                 {
-                    WinningConfiguration = 206 + highest;
-                    Winner = i;
+                    SetWinningConfiguration(10, i, ref continueFlag);
                     continue;
                 }
 
@@ -456,9 +480,7 @@ namespace ZgodnieZTutorialem.Client.Models
                 {
                     if (long.PopCount(temp & (0b1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000L >> j)) == 3 && WinningConfiguration > 216 + j)
                     {
-                        WinningConfiguration = 216 + j;
-                        Winner = i;
-                        continueFlag = true;
+                        SetWinningConfiguration(216 + j, i, ref continueFlag);
                     }
                 }
 
@@ -474,9 +496,7 @@ namespace ZgodnieZTutorialem.Client.Models
                         {
                             if (long.PopCount(temp & (0b1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000L >> k)) == 2 && WinningConfiguration > 229 + j * 13 + k)
                             {
-                                WinningConfiguration = 229 + j * 13 + k;
-                                Winner = i;
-                                continueFlag = true;
+                                SetWinningConfiguration(229 + j * 13 + k, i, ref continueFlag);
                                 break;
                             }
                         }
@@ -494,9 +514,7 @@ namespace ZgodnieZTutorialem.Client.Models
                 {
                     if (long.PopCount(temp & (0b1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000L >> j)) == 2 && WinningConfiguration > 385 + j)
                     {
-                        WinningConfiguration = 385 + j;
-                        Winner = i;
-                        continueFlag = true;
+                        SetWinningConfiguration(385 + j, i, ref continueFlag);
                         break;
                     }
 
@@ -512,8 +530,7 @@ namespace ZgodnieZTutorialem.Client.Models
                 {
                     if (long.PopCount(temp & (0b1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000L >> j)) == 1 && WinningConfiguration > 398 + j)
                     {
-                        WinningConfiguration = 398 + j;
-                        Winner = i;
+                        SetWinningConfiguration(398 + j, i, ref continueFlag);
                         break;
                     }
                 }

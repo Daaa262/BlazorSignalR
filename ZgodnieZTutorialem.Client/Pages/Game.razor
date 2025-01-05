@@ -102,15 +102,30 @@ else
 
     @if(thisTable.Stage == 4)
     {
-        <h2 style="color:#b06000">Rozdanie wygrywa gracz @thisTable.Players[thisTable.Winner].Nick z układem: @thisTable.WinningCombinationString()</h2>
+        @if(thisTable.Winner.Count == 1)
+        {
+            <h2 style="color:#b06000">Gracz @thisTable.Players[thisTable.Winner[0]].Nick wygrywa @thisTable.Pot z układem: @thisTable.WinningCombinationString()</h2>
+        }
+        else
+        {
+            <h2 style="color:#b06000">Gracze:</h2>
+            @foreach(var winner in thisTable.Winner)
+            {
+                <h2 style="color:#b06000">@thisTable.Players[thisTable.Winner[0]].Nick</h2>
+            }
+            <h2 style="color:#b06000">wygrywają @thisTable.Pot z układami @thisTable.WinningCombinationString()</h2>
+        }
 
         <button @onclick="Okej" disabled="@thisTable.Players[MyIndex].Okej">Okej (@OkejPlayers/@thisTable.Players.Count)</button>
     }
     else if (thisTable.Stage == 5) //if everyone folded but one player
     {
-        <h2 style="color:#b06000">>Wszyscy gracze spasowali, rozdanie wygrywa @thisTable.Players[thisTable.Winner].Nick</h2>
+        <h2 style="color:#b06000">Wszyscy gracze spasowali, gracz @thisTable.Players[thisTable.Winner[0]].Nick wygrywa @thisTable.Pot</h2>
 
-        <button @onclick="Okej" disabled="@thisTable.Players[MyIndex].Okej">Okej (@OkejPlayers/@thisTable.Players.Count)</button>
+        @if(MyIndex != -1)
+        {
+            <button @onclick="Okej" disabled="@thisTable.Players[MyIndex].Okej">Okej (@OkejPlayers/@thisTable.Players.Count)</button>
+        }
     }
 }
 
@@ -210,8 +225,8 @@ else
             int buffer = thisTable.StartChipCount * 6;
             foreach (var player in thisTable.Players)
             {
-                if (player.CurrentBid + player.Chips < buffer)
-                    buffer = player.CurrentBid + player.Chips;
+                if (player.CurrentBid + player.Chips - thisTable.Players[MyIndex].CurrentBid < buffer)
+                    buffer = player.CurrentBid + player.Chips - thisTable.Players[MyIndex].CurrentBid;
             }
             maxBid = buffer;
         }
