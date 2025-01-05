@@ -9,6 +9,7 @@
         public int CurrentBid { get; set; } = 0;
         public bool Fold { get; set; } = false;
         public bool Check { get; set; } = false;
+        public bool Okej { get; set; } = false;
         public Player(bool isReady, int chips, string nick)
         {
             IsReady = isReady;

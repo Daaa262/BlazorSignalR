@@ -13,6 +13,38 @@ public class TableHub : Hub
 {
     private static List<Table> table = [];
     public Random random = new();
+    public async Task Okej(string tableName, int index)
+    {
+        if(DebugInfo.debug)
+            Console.WriteLine($"Okej in hub called for \"{tableName}\" with player index {index}");
+
+        foreach (var tab in table)
+        {
+            if (tab.TableName == tableName)
+            {
+                tab.Players[index].Okej = true;
+
+                bool okejFlag = true;
+                foreach(var player in tab.Players)
+                {
+                    if (!player.Okej)
+                        okejFlag = false;
+                }
+                if (okejFlag)
+                {
+                    if (DebugInfo.debug)
+                        Console.WriteLine($"Next shuffle send for table \"{tableName}\"");
+
+                    tab.StartRound();
+                    await Clients.Group(tableName).SendAsync("NextShuffle", tab);
+                    return;
+                }
+
+                await Clients.Group(tableName).SendAsync("NewOkej", index);
+                return;
+            }
+        }
+    }
     public async Task Fold(string tableName, int index)
     {
         if (DebugInfo.debug)
@@ -86,138 +118,7 @@ public class TableHub : Hub
                 if (DebugInfo.debug)
                     Console.WriteLine($"Ready in hub called for \"{tableName}\", gameIsStarting");
 
-                //CardFlag is used to check if card is already drawn (set false if drawn)
-
-                //drawing on table
-                for (int i = 0; i < 5; i++)
-                {
-                    bool CardFlag = true;
-                    while (CardFlag)
-                    {
-                        tab.Cards[i] = random.Next(52);
-
-                        CardFlag = false;
-                        for (int j = 0; j < i; j++)
-                        {
-                            if (tab.Cards[i] == tab.Cards[j])
-                            {
-                                CardFlag = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (DebugInfo.debug)
-                        Console.WriteLine($"On table \"{tableName}\" card {tab.Cards[i]} has been drawn");
-                }
-
-                //drawing for players in poker
-                for (int i = 0; i < tab.Players.Count; i++)
-                {
-                    //first card
-                    bool CardFlag = true;
-                    while (CardFlag)
-                    {
-                        tab.Players[i].Cards[0] = random.Next(52);
-
-                        //on table
-                        CardFlag = false;
-                        for (int j = 0; j < 5; j++)
-                        {
-                            if (tab.Players[i].Cards[0] == tab.Cards[j])
-                            {
-                                CardFlag = true;
-                                break;
-                            }
-                        }
-
-                        if (CardFlag)
-                            continue;
-
-                        //on other players hand
-                        CardFlag = false;
-                        for (int j = 0; j < i; j++)
-                        {
-                            if (tab.Players[i].Cards[0] == tab.Players[j].Cards[0] || tab.Players[i].Cards[0] == tab.Players[j].Cards[1])
-                            {
-                                CardFlag = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (DebugInfo.debug)
-                        Console.WriteLine($"On table \"{tab.TableName}\" card {tab.Players[i].Cards[0]} has been drawn for player \"{tab.Players[i].Nick}\"");
-
-                    //second card
-                    CardFlag = true;
-                    while (CardFlag)
-                    {
-                        tab.Players[i].Cards[1] = random.Next(52);
-
-                        if(tab.Players[i].Cards[1] == tab.Players[i].Cards[0])
-                            continue;
-
-                        //on table
-                        CardFlag = false;
-                        for (int j = 0; j < 5; j++)
-                        {
-                            if (tab.Players[i].Cards[1] == tab.Cards[j])
-                            {
-                                CardFlag = true;
-                                break;
-                            }
-                        }
-
-                        if (CardFlag)
-                            continue;
-
-                        //on other players hand
-                        CardFlag = false;
-                        for (int j = 0; j < i; j++)
-                        {
-                            if (tab.Players[i].Cards[1] == tab.Players[j].Cards[0] || tab.Players[i].Cards[1] == tab.Players[j].Cards[1])
-                            {
-                                CardFlag = true;
-                                break;
-                            }
-                        }
-
-                        if (CardFlag)
-                            continue;
-                    }
-
-                    if (DebugInfo.debug)
-                        Console.WriteLine($"On table \"{tab.TableName}\" card {tab.Players[i].Cards[1]} has been drawn for player \"{tab.Players[i].Nick}\"");
-                }
-
-                tab.GameStarted = true;
-                tab.Dealer = random.Next(tab.MaxPlayerCount);
-                tab.Stage = 0;
-
-                //set blinds
-                if (tab.MaxPlayerCount == 2)
-                {
-                    tab.Players[tab.Dealer].CurrentBid = tab.Blind;
-                    tab.Players[tab.Dealer].Chips -= tab.Blind;
-
-                    tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].CurrentBid = tab.Blind * 2;
-                    tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].Chips -= tab.Blind * 2;
-                    tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].Check = true;
-
-                    tab.Turn = tab.Dealer;
-                }
-                else
-                {
-                    tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].CurrentBid = tab.Blind;
-                    tab.Players[(tab.Dealer + 1) % tab.MaxPlayerCount].Chips -= tab.Blind;
-
-                    tab.Players[(tab.Dealer + 2) % tab.MaxPlayerCount].CurrentBid = tab.Blind * 2;
-                    tab.Players[(tab.Dealer + 2) % tab.MaxPlayerCount].Chips -= tab.Blind * 2;
-                    tab.Players[(tab.Dealer + 2) % tab.MaxPlayerCount].Check = true;
-
-                    tab.Turn = (tab.Dealer + 3) % tab.MaxPlayerCount;
-                }
+                tab.StartRound(true);
 
                 await Clients.Group(tableName).SendAsync("StartGame", tab);
                 break;

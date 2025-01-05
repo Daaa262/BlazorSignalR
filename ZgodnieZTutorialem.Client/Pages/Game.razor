@@ -102,27 +102,15 @@ else
 
     @if(thisTable.Stage == 4)
     {
-        <h2>Rozdanie wygrywa gracz @thisTable.Players[thisTable.Winner].Nick z układem: @thisTable.WinningCombinationString() @thisTable.WinningConfiguration</h2>
-        //TODO: Show cofiguration of winning hand and chips won
+        <h2 style="color:#b06000">Rozdanie wygrywa gracz @thisTable.Players[thisTable.Winner].Nick z układem: @thisTable.WinningCombinationString()</h2>
 
-        <button>Okej</button>
-        //TODO: Add button to reset game
+        <button @onclick="Okej" disabled="@thisTable.Players[MyIndex].Okej">Okej (@OkejPlayers/@thisTable.Players.Count)</button>
     }
     else if (thisTable.Stage == 5) //if everyone folded but one player
     {
-        <h2>Wszyscy gracze spasowali, rozdanie wygrywa @thisTable.Players[thisTable.Winner].Nick</h2>
-        //TODO: Show chips won
+        <h2 style="color:#b06000">>Wszyscy gracze spasowali, rozdanie wygrywa @thisTable.Players[thisTable.Winner].Nick</h2>
 
-        <button>Okej</button>
-        //TODO: Add button to reset game
-    }
-    else if(thisTable.Stage == 6) //end game
-    {
-        <h2>Gre wygrywa gracz @thisTable.Players[thisTable.Winner].Nick</h2>
-        //TODO Show winner
-
-        <button>Okej</button>
-        //TODO: Add button to go back to lobby
+        <button @onclick="Okej" disabled="@thisTable.Players[MyIndex].Okej">Okej (@OkejPlayers/@thisTable.Players.Count)</button>
     }
 }
 
@@ -138,6 +126,16 @@ else
     private int bid = 0;
     private int minBid = 0;
     private int maxBid = 0;
+    private int OkejPlayers = 0;
+
+    private async Task Okej()
+    {
+        if (DebugInfo.debug)
+            Console.WriteLine($"Okej called in Game by player \"{nick}\"");
+
+        if (hubConnection is not null)
+            await hubConnection.SendAsync("Okej", tableName, MyIndex);
+    }
 
     private async Task Fold()
     {
@@ -200,11 +198,53 @@ else
             await hubConnection.SendAsync("JoinTable", tableName, nick);
     }
 
+    private void setBidsOnStart()
+    {
+        //set minimalBid
+        if (MyIndex != -1)
+        {
+            minBid = thisTable.Blind * 2 - thisTable.Players[MyIndex].CurrentBid;
+            bid = minBid;
+
+            //set maximalBid
+            int buffer = thisTable.StartChipCount * 6;
+            foreach (var player in thisTable.Players)
+            {
+                if (player.CurrentBid + player.Chips < buffer)
+                    buffer = player.CurrentBid + player.Chips;
+            }
+            maxBid = buffer;
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         hubConnection = new HubConnectionBuilder()
             .WithUrl(Navigation.ToAbsoluteUri("/tablehub"))
             .Build();
+
+        hubConnection.On<Table>("NextShuffle", (table) =>
+        {
+            if (DebugInfo.debug)
+                Console.WriteLine($"NextShuffle from hub");
+
+            OkejPlayers = 0;
+            thisTable = table;
+            setBidsOnStart();
+
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<int>("NewOkej", (index) =>
+        {
+            if (DebugInfo.debug)
+                Console.WriteLine($"NewOkej from hub with index=\"{index}\"");
+
+            thisTable.Players[index].Okej = true;
+            OkejPlayers++;
+
+            InvokeAsync(StateHasChanged);
+        });
 
         hubConnection.On<int>("NewFold", (index) =>
         {
@@ -231,7 +271,7 @@ else
             if (DebugInfo.debug)
                 Console.WriteLine($"NewBid from hub with index=\"{index}\" and bid=\"{newBid}\"");
 
-			thisTable.Bid(index, newBid);
+            thisTable.Bid(index, newBid);
 
             //set minimalBid
             if (MyIndex != -1)
@@ -249,6 +289,13 @@ else
                 Console.WriteLine($"ReceiveInfo from hub with \"{tableInfo.TableName}\"");
 
             thisTable = tableInfo;
+            foreach(var player in thisTable.Players)
+            {
+                if (player.IsReady)
+                    ReadyPlayers++;
+                if (player.Okej)
+                    OkejPlayers++;
+            }
 
             InvokeAsync(StateHasChanged);
         });
@@ -286,21 +333,7 @@ else
 
             thisTable = table;
 
-            //set minimalBid
-            if (MyIndex != -1)
-            {
-                minBid = thisTable.Blind * 2 - thisTable.Players[MyIndex].CurrentBid;
-                bid = minBid;
-
-                //set maximalBid
-                int buffer = thisTable.StartChipCount * 6;
-                foreach (var player in thisTable.Players)
-                {
-                    if (player.CurrentBid + player.Chips < buffer)
-                        buffer = player.CurrentBid + player.Chips;
-                }
-                maxBid = buffer;
-            }
+            setBidsOnStart();
 
             if (DebugInfo.debug)
                 Console.WriteLine($"Bidding starts with player index {thisTable.Turn}");

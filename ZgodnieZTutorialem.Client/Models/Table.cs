@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.X86;
@@ -20,6 +21,7 @@ namespace ZgodnieZTutorialem.Client.Models
         public int Winner { get; set; }
         public int WinningConfiguration { get; set; }
         public int Turn { get; set; }
+        public Random Rand { get; set; } = new();
         public Table(string tableName, int maxPlayerCount, int startChipCount, int blind)
         {
             TableName = tableName;
@@ -30,6 +32,152 @@ namespace ZgodnieZTutorialem.Client.Models
         public Table() // This constructor is required for SignalR
         {
 
+        }
+        public void DrawCards()
+        {
+            //CardFlag is used to check if card is already drawn (set false if drawn)
+
+            //drawing on table
+            for (int i = 0; i < 5; i++)
+            {
+                bool CardFlag = true;
+                while (CardFlag)
+                {
+                    Cards[i] = Rand.Next(52);
+
+                    CardFlag = false;
+                    for (int j = 0; j < i; j++)
+                    {
+                        if (Cards[i] == Cards[j])
+                        {
+                            CardFlag = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            //drawing for players in poker
+            for (int i = 0; i < Players.Count; i++)
+            {
+                //first card
+                bool CardFlag = true;
+                while (CardFlag)
+                {
+                    Players[i].Cards[0] = Rand.Next(52);
+
+                    //on table
+                    CardFlag = false;
+                    for (int j = 0; j < 5; j++)
+                    {
+                        if (Players[i].Cards[0] == Cards[j])
+                        {
+                            CardFlag = true;
+                            break;
+                        }
+                    }
+
+                    if (CardFlag)
+                        continue;
+
+                    //on other players hand
+                    CardFlag = false;
+                    for (int j = 0; j < i; j++)
+                    {
+                        if (Players[i].Cards[0] == Players[j].Cards[0] || Players[i].Cards[0] == Players[j].Cards[1])
+                        {
+                            CardFlag = true;
+                            break;
+                        }
+                    }
+                }
+
+                //second card
+                CardFlag = true;
+                while (CardFlag)
+                {
+                    Players[i].Cards[1] = Rand.Next(52);
+
+                    if (Players[i].Cards[1] == Players[i].Cards[0])
+                        continue;
+
+                    //on table
+                    CardFlag = false;
+                    for (int j = 0; j < 5; j++)
+                    {
+                        if (Players[i].Cards[1] == Cards[j])
+                        {
+                            CardFlag = true;
+                            break;
+                        }
+                    }
+
+                    if (CardFlag)
+                        continue;
+
+                    //on other players hand
+                    CardFlag = false;
+                    for (int j = 0; j < i; j++)
+                    {
+                        if (Players[i].Cards[1] == Players[j].Cards[0] || Players[i].Cards[1] == Players[j].Cards[1])
+                        {
+                            CardFlag = true;
+                            break;
+                        }
+                    }
+
+                    if (CardFlag)
+                        continue;
+                }
+            }
+        }
+        public void StartRound(bool first = false)
+        {
+            DrawCards();
+
+            if (first)
+                Dealer = Rand.Next(Players.Count);
+            else
+            {
+                Dealer = (Dealer + 1) % Players.Count;
+                int pot = 0;
+                foreach(var player in Players)
+                {
+                    pot += player.CurrentBid;
+                    player.CurrentBid = 0;
+                    player.Okej = false;
+                    player.Check = false;
+                    player.Fold = false;
+                }
+                Players[Winner].Chips += pot;
+            }
+            Stage = 0;
+
+            //set blinds
+            if (MaxPlayerCount == 2)
+            {
+                Players[Dealer].CurrentBid = Blind;
+                Players[Dealer].Chips -= Blind;
+
+                Players[(Dealer + 1) % Players.Count].CurrentBid = Blind * 2;
+                Players[(Dealer + 1) % Players.Count].Chips -= Blind * 2;
+                Players[(Dealer + 1) % Players.Count].Check = true;
+
+                Turn = Dealer;
+            }
+            else
+            {
+                Players[(Dealer + 1) % Players.Count].CurrentBid = Blind;
+                Players[(Dealer + 1) % Players.Count].Chips -= Blind;
+
+                Players[(Dealer + 2) % Players.Count].CurrentBid = Blind * 2;
+                Players[(Dealer + 2) % Players.Count].Chips -= Blind * 2;
+                Players[(Dealer + 2) % Players.Count].Check = true;
+
+                Turn = (Dealer + 3) % Players.Count;
+            }
+
+            GameStarted = true;
         }
         public void NextTurn()
         {
@@ -164,9 +312,11 @@ namespace ZgodnieZTutorialem.Client.Models
 
 
 
-        public void FindWinner()
+        public void FindWinner() //ADD SPLITTING
         {
-            //contain information about total cards each player can use
+            //cards are encoded as 52 bit integer where each bit set to 1 means card appeared, and 0 means it doesn't bit from left to right are A K Q J 10 9 8 7 6 5 4 3 2 and suits are ordered left to right as ♥♦♣♠
+
+            //contains information about total cards each player can use
             long[] hand = new long[Players.Count];
 
             //add cards on table to each player's use
@@ -182,8 +332,6 @@ namespace ZgodnieZTutorialem.Client.Models
 
                 Console.WriteLine($"Gracz {i} ma rękę {Convert.ToString(hand[i], 2)}");
             }
-
-            //const Int64 suit = 0b1_1111_1111_1111;
 
             WinningConfiguration = 410; // 1 best, higher worse
             Winner = -1;
@@ -375,7 +523,7 @@ namespace ZgodnieZTutorialem.Client.Models
         public string WinningCombinationString()
         {
             if(WinningConfiguration == 1)
-                return "Poker królewski";
+                return "Poker Królewski!";
             else if (WinningConfiguration <= 10)
                 return "Poker";
             else if (WinningConfiguration <= 23)
