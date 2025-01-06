@@ -412,11 +412,6 @@ else
             thisTable.Players[index].IsReady = true;
             ReadyPlayers++;
 
-            if (ReadyPlayers == thisTable.Players.Count)
-            {
-                thisTable.GameStarted = true;
-            }
-
             InvokeAsync(StateHasChanged);
         });
 

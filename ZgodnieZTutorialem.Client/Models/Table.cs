@@ -166,7 +166,7 @@ namespace ZgodnieZTutorialem.Client.Models
                 int remainder = Pot % Winner.Count;
                 foreach(var winner in Winner)
                 {
-                    Players[winner].Chips += Pot / Winner.Count;
+                    Players[winner].Chips += Pot / Winner.Count; // tutaj błąd XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
                 }
 
                 int index = 0;
@@ -454,7 +454,7 @@ namespace ZgodnieZTutorialem.Client.Models
 
             //cards are encoded as 52 bit integer where each bit set to 1 means card appeared, and 0 means it doesn't bit from left to right are A K Q J 10 9 8 7 6 5 4 3 2 and suits are ordered left to right as ♥♦♣♠
 
-                //contains information about total cards each player can use
+            //contains information about total cards each player can use
             long[] hand = new long[Players.Count];
 
             //add cards on table to each player's use
@@ -557,23 +557,32 @@ namespace ZgodnieZTutorialem.Client.Models
                     continue;
 
                 //straight (206 - 218)
-                int length = 0, highest = 0;
+                int length = 0, highest = -1, highestBuffer = -1;
                 for (int j = 0; j < 13; j++)
                 {
                     if ((temp & (0b1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000___1_0000_0000_0000L >> j)) != 0)
                     {
-                        highest = j;
+                        if(highestBuffer == -1)
+                            highestBuffer = j;
                         length++;
                     }
                     else
                     {
                         if (length >= 5)
+                        {
+                            highest = highestBuffer;
                             break;
+                        }
+
+                        highestBuffer = -1;
                         length = 0;
                     }
                 }
                 if (length >= 5 && WinningConfiguration > 206 + highest)
                 {
+                    if(highest == -1)
+                        highest = highestBuffer;
+
                     SetWinningConfiguration(10, i, ref continueFlag);
                     continue;
                 }
