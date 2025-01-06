@@ -13,6 +13,25 @@ public class TableHub : Hub
 {
     private static List<Table> table = [];
     public Random random = new();
+    public async Task RemoveTable(string tableName)
+    {
+        if (DebugInfo.debug)
+            Console.WriteLine($"RemoveTable called for \"{tableName}\".");
+
+        foreach (var tab in table)
+        {
+            if(tab.TableName == tableName)
+            {
+                table.Remove(tab);
+
+                if (DebugInfo.debug)
+                    Console.WriteLine($"Table \"{tableName}\" removed from hub.");
+
+                await Clients.All.SendAsync("TableRemoved", tableName);
+                return;
+            }
+        }
+    }
     public async Task Okej(string tableName, int index)
     {
         if(DebugInfo.debug)
@@ -32,11 +51,22 @@ public class TableHub : Hub
                 }
                 if (okejFlag)
                 {
-                    if (DebugInfo.debug)
-                        Console.WriteLine($"Next shuffle send for table \"{tableName}\"");
+                    if (tab.Stage == 6)
+                    {
+                        if (DebugInfo.debug)
+                            Console.WriteLine($"RemovePlayers send for table \"{tableName}\"");
 
-                    tab.StartRound();
-                    await Clients.Group(tableName).SendAsync("NextShuffle", tab);
+                        tab.RemovePlayers();
+                        await Clients.Group(tableName).SendAsync("RemovePlayers", tab);
+                    }
+                    else
+                    {
+                        if (DebugInfo.debug)
+                            Console.WriteLine($"EndRound send for table \"{tableName}\"");
+
+                        tab.EndRound();
+                        await Clients.Group(tableName).SendAsync("EndRound", tab);
+                    }
                     return;
                 }
 

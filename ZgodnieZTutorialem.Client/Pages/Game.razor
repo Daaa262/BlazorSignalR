@@ -72,7 +72,7 @@ else
     }
     <br>
     <br>
-    @for(int i = 0; i < thisTable.MaxPlayerCount; i++)
+    @for(int i = 0; i < thisTable.Players.Count; i++)
     {
         <div style=@((i == thisTable.Turn && thisTable.Stage <= 3) ? (i == MyIndex ? (thisTable.Players[i].Fold ? "color:#70c070; background-color:#f2f2f2" : "color:#009000; background-color:#f2f2f2") : (thisTable.Players[i].Fold ? "color:#b0b0b0; background-color:#f2f2f2" : "background-color:#f2f2f2")) : (i == MyIndex ? (thisTable.Players[i].Fold ? "color:#70c070" : "color:#009000") : (thisTable.Players[i].Fold ? "color:#b0b0b0" : "")))>
             <h3>@thisTable.Players[i].Nick@(thisTable.Dealer == i ? " (Dealer)" : "")</h3>
@@ -85,7 +85,7 @@ else
                 @if (i == thisTable.Turn && thisTable.Stage < 4)
                 {
                     <input @bind="bid" />
-                    <button @onclick="Bid" disabled="@(bid > thisTable.Players[i].Chips || bid > maxBid || bid <= minBid || thisTable.Players[i].Fold)">Podbij</button>
+                    <button @onclick="Bid" disabled="@(bid > thisTable.Players[i].Chips || bid + thisTable.Players[i].CurrentBid > maxBid || bid <= minBid || thisTable.Players[i].Fold)">Podbij</button>
                     <button @onclick="Check" disabled="@(bid != minBid || thisTable.Players[i].Fold)">Sprawdź</button>
                     <button @onclick="Fold" disabled="@thisTable.Players[i].Fold">Pas</button>
                 }
@@ -111,14 +111,17 @@ else
             <h2 style="color:#b06000">Gracze:</h2>
             @foreach(var winner in thisTable.Winner)
             {
-                <h2 style="color:#b06000">@thisTable.Players[thisTable.Winner[0]].Nick</h2>
+                <h2 style="color:#b06000">@thisTable.Players[winner].Nick</h2>
             }
-            <h2 style="color:#b06000">wygrywają @thisTable.Pot z układami @thisTable.WinningCombinationString()</h2>
+            <h2 style="color:#b06000">wygrywają @(thisTable.Pot / @thisTable.Winner.Count) z układami @thisTable.WinningCombinationString()</h2>
         }
 
-        <button @onclick="Okej" disabled="@thisTable.Players[MyIndex].Okej">Okej (@OkejPlayers/@thisTable.Players.Count)</button>
+        @if (MyIndex != -1)
+        {
+            <button @onclick="Okej" disabled="@thisTable.Players[MyIndex].Okej">Okej (@OkejPlayers/@thisTable.Players.Count)</button>
+        }
     }
-    else if (thisTable.Stage == 5) //if everyone folded but one player
+    else if (thisTable.Stage == 5)
     {
         <h2 style="color:#b06000">Wszyscy gracze spasowali, gracz @thisTable.Players[thisTable.Winner[0]].Nick wygrywa @thisTable.Pot</h2>
 
@@ -126,6 +129,33 @@ else
         {
             <button @onclick="Okej" disabled="@thisTable.Players[MyIndex].Okej">Okej (@OkejPlayers/@thisTable.Players.Count)</button>
         }
+    }
+    else if(thisTable.Stage == 6)
+    {
+        @if(thisTable.PlayerToRemove.Count == 1)
+        {
+            <h2 style="color:#ff0000">Gracz @thisTable.Players[thisTable.PlayerToRemove[0]].Nick odpada.</h2>
+        }
+        else
+        {
+            <h2 style="color:#ff0000">Gracze:</h2>
+            @foreach (var loser in thisTable.PlayerToRemove)
+            {
+                <h2 style="color:#ff0000">@thisTable.Players[loser].Nick</h2>
+            }
+            <h2 style="color:#ff0000">odpadają.</h2>
+        }
+
+        @if (MyIndex != -1)
+        {
+            <button @onclick="Okej" disabled="@thisTable.Players[MyIndex].Okej">Okej (@OkejPlayers/@thisTable.Players.Count)</button>
+        }
+    }
+    else if(thisTable.Stage == 7)
+    {
+        <h2 style="color:#3000ff">Gracz @thisTable.Players[0].Nick wygrał!!!</h2>
+
+        <button @onclick="BackToLobby">Powrót</button>
     }
 }
 
@@ -142,6 +172,17 @@ else
     private int minBid = 0;
     private int maxBid = 0;
     private int OkejPlayers = 0;
+
+    private async Task BackToLobby()
+    {
+        if (DebugInfo.debug)
+            Console.WriteLine($"BackToLobby called in \"{tableName}\"");
+
+        if (MyIndex != -1 && hubConnection is not null)
+            await hubConnection.SendAsync("RemoveTable", tableName);
+
+        Navigation.NavigateTo($"/lobby");
+    }
 
     private async Task Okej()
     {
@@ -225,8 +266,8 @@ else
             int buffer = thisTable.StartChipCount * 6;
             foreach (var player in thisTable.Players)
             {
-                if (player.CurrentBid + player.Chips - thisTable.Players[MyIndex].CurrentBid < buffer)
-                    buffer = player.CurrentBid + player.Chips - thisTable.Players[MyIndex].CurrentBid;
+                if (player.CurrentBid + player.Chips < buffer)
+                    buffer = player.CurrentBid + player.Chips;
             }
             maxBid = buffer;
         }
@@ -238,14 +279,52 @@ else
             .WithUrl(Navigation.ToAbsoluteUri("/tablehub"))
             .Build();
 
-        hubConnection.On<Table>("NextShuffle", (table) =>
+        hubConnection.On<string>($"TableRemoved", (name) =>
         {
             if (DebugInfo.debug)
-                Console.WriteLine($"NextShuffle from hub");
+                Console.WriteLine($"TableRemoved called from hub to table {name}");
+
+            if(tableName == name)
+            {
+                if (DebugInfo.debug)
+                    Console.WriteLine($"Moveing back to lobby");
+
+                Navigation.NavigateTo($"/lobby");
+            }
+        });
+
+        hubConnection.On<Table>($"RemovePlayers", (table) =>
+        {
+            if (DebugInfo.debug)
+                Console.WriteLine($"RemovePlayers from hub");
+
+            int buffer = 0;
+            for(int i = 0; i < thisTable.PlayerToRemove.Count; i++)
+            {
+                if (MyIndex == thisTable.PlayerToRemove[i])
+                    MyIndex = -1;
+                else if (MyIndex > thisTable.PlayerToRemove[i])
+                    buffer++;
+            }
+            MyIndex -= buffer;
 
             OkejPlayers = 0;
             thisTable = table;
             setBidsOnStart();
+
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<Table>("EndRound", (table) =>
+        {
+            if (DebugInfo.debug)
+                Console.WriteLine($"EndRound from hub");
+
+            OkejPlayers = 0;
+            thisTable = table;
+
+            if(thisTable.Stage != 6)
+                setBidsOnStart();
 
             InvokeAsync(StateHasChanged);
         });
@@ -333,7 +412,7 @@ else
             thisTable.Players[index].IsReady = true;
             ReadyPlayers++;
 
-            if (ReadyPlayers == thisTable.MaxPlayerCount)
+            if (ReadyPlayers == thisTable.Players.Count)
             {
                 thisTable.GameStarted = true;
             }

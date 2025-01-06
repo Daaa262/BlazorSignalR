@@ -78,10 +78,28 @@
             .WithUrl(Navigation.ToAbsoluteUri("/tablehub"))
             .Build();
 
+        hubConnection.On<string>("TableRemoved", (name) =>
+        {
+            if (DebugInfo.debug)
+                Console.WriteLine($"TableRemoved called from hub to lobby with name=\"{name}\"");
+
+            foreach(var tab in tables)
+            {
+                if (tab.TableName == name)
+                {
+                    tables.Remove(tab);
+                    break;
+                }
+            }
+
+            InvokeAsync(StateHasChanged);
+        });
+
         hubConnection.On<Table>("ReceiveNewTable", (newTable) =>
         {
             if (DebugInfo.debug)
                 Console.WriteLine($"ReceiveNewTable from hub with tableName=\"{newTable.TableName}\" and {newTable.Players.Count} players");
+
             tables.Add(newTable);
             InvokeAsync(StateHasChanged);
         });
