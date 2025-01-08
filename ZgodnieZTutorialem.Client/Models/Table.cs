@@ -136,6 +136,25 @@ namespace ZgodnieZTutorialem.Client.Models
                 }
             }
         }
+        private void GiveChips()
+        {
+            foreach (var player in Players)
+                player.CurrentBid = 0;
+            int remainder = Pot % Winner.Count;
+            foreach (var winner in Winner)
+                Players[winner].Chips += Pot / Winner.Count;
+
+            int index = 0;
+            while (remainder > 0)
+            {
+                index++;
+                if (Players[(Dealer + index) % Players.Count].Fold)
+                    continue;
+
+                Players[(Dealer + index) % Players.Count].Chips++;
+                remainder--;
+            }
+        }
         private void CalculatePot()
         {
             if (DebugInfo.debug)
@@ -157,27 +176,9 @@ namespace ZgodnieZTutorialem.Client.Models
                 Dealer = (Dealer + 1) % Players.Count;
                 foreach(var player in Players)
                 {
-                    player.CurrentBid = 0;
                     player.Okej = false;
                     player.Check = false;
                     player.Fold = false;
-                }
-
-                int remainder = Pot % Winner.Count;
-                foreach(var winner in Winner)
-                {
-                    Players[winner].Chips += Pot / Winner.Count; // tutaj błąd XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-                }
-
-                int index = 0;
-                while(remainder > 0)
-                {
-                    index++;
-                    if (Players[(Dealer + index) % Players.Count].Fold)
-                        continue;
-
-                    Players[(Dealer + index) % Players.Count].Chips++;
-                    remainder--;
                 }
             }
             Stage = 0;
@@ -228,9 +229,20 @@ namespace ZgodnieZTutorialem.Client.Models
         }
         public void RemovePlayers()
         {
-            foreach (var index in PlayerToRemove)
-                Players.RemoveAt(index);
-            MaxPlayerCount--;
+            if (DebugInfo.debug)
+                Console.WriteLine($"Total number of players: {Players.Count}");
+
+            for(int i = 0; i < PlayerToRemove.Count; i++)
+            {
+                if(DebugInfo.debug)
+                    Console.WriteLine($"Removeing {PlayerToRemove[i]}");
+
+                Players.RemoveAt(PlayerToRemove[i]);
+                for (int j = i + 1; j < PlayerToRemove.Count; j++) ///shift indexes
+                    PlayerToRemove[j]--;
+
+                MaxPlayerCount--;
+            }
 
             foreach (var player in Players)
                 player.Okej = false;
@@ -278,6 +290,8 @@ namespace ZgodnieZTutorialem.Client.Models
                     }
                 }
             }
+
+            GiveChips();
 
             if (Stage != 6)
                 StartRound();
