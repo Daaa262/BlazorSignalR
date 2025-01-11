@@ -229,15 +229,19 @@ namespace ZgodnieZTutorialem.Client.Models
         }
         public void RemovePlayers()
         {
-            if (DebugInfo.debug)
-                Console.WriteLine($"Total number of players: {Players.Count}");
-
             for(int i = 0; i < PlayerToRemove.Count; i++)
             {
-                if(DebugInfo.debug)
+                if (DebugInfo.debug)
+                    Console.WriteLine($"Total number of players: {Players.Count}");
+
+                if (DebugInfo.debug)
                     Console.WriteLine($"Removeing {PlayerToRemove[i]}");
 
                 Players.RemoveAt(PlayerToRemove[i]);
+
+                if (DebugInfo.debug)
+                    Console.WriteLine($"PlayerRemoved. Total number of players: {Players.Count}");
+
                 for (int j = i + 1; j < PlayerToRemove.Count; j++) ///shift indexes
                     PlayerToRemove[j]--;
 

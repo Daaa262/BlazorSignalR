@@ -1,0 +1,30 @@
+﻿@page "/leaderboard"
+@using ZgodnieZTutorialem.Client.Models
+@using ZgodnieZTutorialem.Components.DatabaseAccess
+
+@inject LeaderboardData LeaderboardData
+
+<h1>Zwycięzcy</h1>
+@if (Records is not null)
+{
+	@foreach (var record in Records)
+	{
+		<h3>Stół @record.TableName:		@record.Nick</h3>
+	}
+}
+else
+{
+	<h3>Ładowanie...</h3>
+}
+
+@code {
+	private List<Record> Records;
+
+	protected override async Task OnInitializedAsync()
+	{
+		if (DebugInfo.debug)
+			Console.WriteLine("Leaderboard Initialization");
+
+		Records = await LeaderboardData.GetRecords();
+	}
+}

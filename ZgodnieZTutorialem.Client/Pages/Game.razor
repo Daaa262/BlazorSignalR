@@ -179,7 +179,9 @@ else
             Console.WriteLine($"BackToLobby called in \"{tableName}\"");
 
         if (MyIndex != -1 && hubConnection is not null)
+        {
             await hubConnection.SendAsync("RemoveTable", tableName);
+        }
 
         Navigation.NavigateTo($"/lobby");
     }
@@ -306,7 +308,9 @@ else
                 else if (MyIndex > thisTable.PlayerToRemove[i])
                     buffer++;
             }
-            MyIndex -= buffer;
+
+            if(MyIndex != -1)
+                MyIndex -= buffer;
 
             OkejPlayers = 0;
             thisTable = table;

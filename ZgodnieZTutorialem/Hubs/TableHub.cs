@@ -1,4 +1,6 @@
 ﻿using System.ComponentModel;
+using System.Data;
+using Microsoft.Data.SqlClient;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -6,6 +8,9 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.SignalR;
 using ZgodnieZTutorialem.Client.Models;
+using ZgodnieZTutorialem.Components.DatabaseAccess;
+using Dapper;
+using System.Reflection.Metadata;
 
 namespace ZgodnieZTutorialem.Hubs;
 
@@ -22,6 +27,10 @@ public class TableHub : Hub
         {
             if(tab.TableName == tableName)
             {
+                IDbConnection connection = new SqlConnection("Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=Leaderboard;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=False;Application Intent=ReadWrite;Multi Subnet Failover=False");
+                Record record = new Record(tableName, tab.Players[0].Nick);
+                await connection.ExecuteAsync(@"insert into dbo.WinnersDatabase (Nick, TableName) values (@Nick, @TableName)", record);
+
                 table.Remove(tab);
 
                 if (DebugInfo.debug)

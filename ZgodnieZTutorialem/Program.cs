@@ -3,6 +3,7 @@ using ZgodnieZTutorialem.Components;
 using Microsoft.AspNetCore.ResponseCompression;
 using ZgodnieZTutorialem.Hubs;
 using Microsoft.Extensions.Hosting;
+using ZgodnieZTutorialem.Components.DatabaseAccess;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,9 @@ builder.Services.AddResponseCompression(opts =>
     opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
         ["application/octet-stream"]);
 });
+
+builder.Services.AddTransient<SqlDataAccess>();
+builder.Services.AddTransient<LeaderboardData>();
 
 var app = builder.Build();
 
